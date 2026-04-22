@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Student Dashboard — EWS Platform</title>
+  <link rel="stylesheet" href="css/style.css"/>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body>
+<div class="app-layout">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <h2>EWS Platform</h2>
+      <span>Student Edition</span>
+    </div>
+    
+    <nav class="sidebar-nav">
+      <div class="nav-item active" onclick="showSection('dashboard')" id="nav-dashboard">
+        <span class="icon">📊</span> Dashboard
+      </div>
+      <div class="nav-item" onclick="showSection('scores')" id="nav-scores">
+        <span class="icon">📝</span> My Scores
+      </div>
+      <div class="nav-item" onclick="showSection('classes')" id="nav-classes">
+        <span class="icon">🏫</span> My Class
+      </div>
+    </nav>
+
+    <div class="sidebar-footer">
+      <div class="sidebar-user-mini">
+        <div class="user-avatar-mini" id="avatarText">S</div>
+        <div class="user-info-mini">
+          <div class="name" id="sidebarName">Student</div>
+          <div class="status">Online</div>
+        </div>
+      </div>
+      <button class="btn-logout" onclick="api.logout()">Logout</button>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="main-content">
+    <div class="topbar">
+      <div class="topbar-search">
+        <span class="icon">🔍</span>
+        <input type="text" placeholder="Search students, classes, or reports..."/>
+      </div>
+      <div class="topbar-actions">
+        <div class="notif-btn">
+          🔔 <span class="notif-badge">2</span>
+        </div>
+        <div class="top-user">
+          <div class="avatar" id="topAvatar">S</div>
+          <div class="name" id="topUserName">Student User</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="page-content">
+      <div class="page-header">
+        <h1 id="welcomeText">Welcome back, Student!</h1>
+        <p>Here's your academic performance overview</p>
+      </div>
+
+      <!-- ═══ DASHBOARD ═══ -->
+      <div id="sec-dashboard" class="section active">
+        
+        <div id="noDataState" style="display:none">
+            <div class="card" style="text-align:center; padding:60px;">
+                <span style="font-size:48px">📝</span>
+                <p style="margin-top:16px; color:var(--text-secondary)">You don't have any grades yet. Contact your teacher to update your scores.</p>
+            </div>
+        </div>
+
+        <div id="mainDashboard">
+            <!-- Top Stats -->
+            <div class="stats-grid" id="studentStats">
+                <div class="stat-card blue">
+                    <div><div class="label">Assignments</div><div class="value" id="valAssig">—</div></div>
+                    <div class="stat-icon-wrapper">📘</div>
+                </div>
+                <div class="stat-card purple">
+                    <div><div class="label">Midterm</div><div class="value" id="valMid">—</div></div>
+                    <div class="stat-icon-wrapper">⚙️</div>
+                </div>
+                <div class="stat-card pink">
+                    <div><div class="label">Final</div><div class="value" id="valFinal">—</div></div>
+                    <div class="stat-icon-wrapper">🏆</div>
+                </div>
+                <div class="stat-card green">
+                    <div><div class="label">Overall</div><div class="value" id="valOverall">—</div></div>
+                    <div class="stat-icon-wrapper">📈</div>
+                </div>
+            </div>
+
+            <div class="grid-2">
+                <div class="card">
+                    <div class="card-title">Score Breakdown</div>
+                    <div class="chart-container"><canvas id="radarChart"></canvas></div>
+                </div>
+                <div class="card">
+                    <div class="card-title">🤖 AI Performance Prediction</div>
+                    <div class="chart-container" style="height:200px"><canvas id="probChart"></canvas></div>
+                    <div id="riskLevelWrap" style="margin-top:20px; padding:12px; background:#F9FAFB; border-radius:8px; display:flex; justify-content:space-between; align-items:center;">
+                        <div>
+                            <div style="font-size:11px; color:var(--text-secondary)">Predicted Performance</div>
+                            <div id="predLabel">Loading...</div>
+                        </div>
+                        <div style="text-align:right">
+                            <div style="font-size:11px; color:var(--text-secondary)">Confidence</div>
+                            <div style="font-weight:700" id="confidenceValue">95%</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card" id="recommendationsCard">
+                <div class="card-title">💡 Personalized Recommendations</div>
+                <ul class="progress-list" id="recommendationsList">
+                    <!-- Populated by JS -->
+                </ul>
+            </div>
+
+            <div class="card">
+                <div class="card-title">Current Enrollment</div>
+                <div style="display:flex; align-items:center; justify-content:space-between; padding:16px; border:1px solid var(--border); border-radius:10px;">
+                    <div style="display:flex; align-items:center; gap:16px;">
+                        <div class="stat-icon-wrapper" style="background:var(--primary); width:40px; height:40px; border-radius:8px; font-size:18px;">📘</div>
+                        <div>
+                            <div style="font-weight:700" id="enrollClassName">Loading...</div>
+                            <div style="font-size:12px; color:var(--text-secondary)">Active Course</div>
+                        </div>
+                    </div>
+                    <div style="text-align:right">
+                        <div style="font-weight:700" id="enrollScore">—</div>
+                        <div style="font-size:11px; color:var(--text-secondary)">Current Grade</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+      </div>
+
+    </div>
+  </main>
+</div>
+
+<script src="js/api.js"></script>
+<script>
+const user = requireAuth(['student']);
+if (user) {
+  document.getElementById('sidebarName').textContent = user.ho_ten || user.username;
+  document.getElementById('topUserName').textContent = user.ho_ten || user.username;
+  document.getElementById('avatarText').textContent  = (user.ho_ten || user.username)[0].toUpperCase();
+  document.getElementById('topAvatar').textContent    = (user.ho_ten || user.username)[0].toUpperCase();
+  document.getElementById('welcomeText').textContent = `Welcome back, ${user.ho_ten.split(' ')[0]}!`;
+}
+
+let radarChart, probChart;
+
+async function loadData() {
+  const meResp = await api.get('/auth/me/');
+  const me = await meResp.json();
+  const studResp = await api.get('/students/');
+  const studD = await studResp.json();
+  const myStudent = studD.results.find(s => s.nguoi_dung == me.id);
+
+  if (!myStudent) {
+    document.getElementById('mainDashboard').style.display = 'none';
+    document.getElementById('noDataState').style.display = 'block';
+    return;
+  }
+
+  const progResp = await api.get(`/students/${myStudent.id}/progress/`);
+  const prog = await progResp.json();
+  const bd = prog.bang_diem[0];
+
+  if (!bd) {
+    document.getElementById('mainDashboard').style.display = 'none';
+    document.getElementById('noDataState').style.display = 'block';
+    return;
+  }
+
+  // Populate stats
+  document.getElementById('valAssig').textContent = `${((bd.homework_1+bd.homework_2+bd.homework_3)/3).toFixed(1)}%`;
+  document.getElementById('valMid').textContent = `${bd.midterm_score}%`;
+  document.getElementById('valFinal').textContent = `${bd.final_exam}%`;
+  document.getElementById('valOverall').textContent = `${bd.final_score}%`;
+  document.getElementById('enrollClassName').textContent = myStudent.lop_ten || 'Not Enrolled';
+  document.getElementById('enrollScore').textContent = `${bd.final_score}%`;
+
+  // Radar Chart
+  if (radarChart) radarChart.destroy();
+  radarChart = new Chart(document.getElementById('radarChart'), {
+      type: 'radar',
+      data: {
+          labels: ['HW Avg', 'Quiz Avg', 'Midterm', 'Final', 'Attendance'],
+          datasets: [{
+              label: 'Your Scores',
+              data: [((bd.homework_1+bd.homework_2+bd.homework_3)/3)*10, ((bd.quiz_1+bd.quiz_2)/2)*10, bd.midterm_score*10, bd.final_exam*10, bd.attendance_rate*100],
+              backgroundColor: 'rgba(0, 71, 255, 0.1)',
+              borderColor: '#0047FF',
+              borderWidth: 2
+          }]
+      },
+      options: { scales: { r: { min: 0, max: 100 } }, plugins: { legend: { display: false } } }
+  });
+
+  // AI Prediction
+  const dd = prog.du_doan_moi_nhat;
+  if (dd) {
+      document.getElementById('predLabel').innerHTML = getLabelBadge(dd.predicted_label);
+      document.getElementById('confidenceValue').textContent = `${(Math.max(dd.prob_weak, dd.prob_average, dd.prob_good, dd.prob_excellent)*100).toFixed(0)}%`;
+      
+      if (probChart) probChart.destroy();
+      probChart = new Chart(document.getElementById('probChart'), {
+          type: 'bar',
+          data: {
+              labels: ['Excellent', 'Good', 'Average', 'At Risk'],
+              datasets: [{
+                  data: [dd.prob_excellent*100, dd.prob_good*100, dd.prob_average*100, dd.prob_weak*100],
+                  backgroundColor: ['#22C55E', '#3B82F6', '#F59E0B', '#EF4444'],
+                  borderRadius: 5
+              }]
+          },
+          options: { indexAxis: 'y', plugins: { legend: { display: false } }, scales: { x: { min: 0, max: 100 } } }
+      });
+
+      // Recommendations
+      const list = document.getElementById('recommendationsList');
+      list.innerHTML = '';
+      const recs = [];
+      if (dd.risk_level === 'high_risk') {
+          recs.push({ text: 'Immediate tutor assistance required.', color: 'red' });
+          recs.push({ text: 'Review fundamental concepts in this course.', color: 'orange' });
+      } else if (dd.risk_level === 'medium_risk') {
+          recs.push({ text: 'Increase study hours for midterm topics.', color: 'orange' });
+          recs.push({ text: 'Participate in group study sessions.', color: 'blue' });
+      } else {
+          recs.push({ text: 'Continue your consistent study habits.', color: 'green' });
+          recs.push({ text: 'Challenge yourself with advanced problems.', color: 'purple' });
+          recs.push({ text: 'Focus on maintaining strong performance across all assessments.', color: 'blue' });
+      }
+      
+      list.innerHTML = recs.map(r => `
+          <li style="display:flex; align-items:center; gap:12px; padding:12px; background:#F9FAFB; border-radius:8px; margin-bottom:8px; font-size:14px;">
+              <span style="width:10px; height:10px; border-radius:50%; background:${getRecColor(r.color)}"></span>
+              ${r.text}
+          </li>
+      `).join('');
+  }
+}
+
+function getRecColor(c) {
+    const map = { red: '#EF4444', orange: '#F59E0B', green: '#22C55E', blue: '#3B82F6', purple: '#A855F7' };
+    return map[c] || '#9CA3AF';
+}
+
+function showSection(name) {
+    document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+    document.getElementById('sec-' + name)?.classList.add('active');
+    document.getElementById('nav-' + name)?.classList.add('active');
+}
+
+loadData();
+</script>
+</body>
+</html>

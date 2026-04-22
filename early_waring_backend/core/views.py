@@ -1,0 +1,845 @@
+"""
+=============================================================
+  Early Warning System - API Views
+  REST API cho 5 models + Auth + ML Predict + Dashboard
+=============================================================
+"""
+
+import sys
+import os
+from django.conf import settings
+from django.db.models import Count, Avg, Q
+from django.contrib.auth import login, logout
+from rest_framework import status, generics, permissions
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework_simplejwt.tokens import RefreshToken
+
+from .models import NguoiDung, LopHoc, HocVien, BangDiem, DuDoanML
+from .serializers import (
+    LoginSerializer, RegisterSerializer, NguoiDungSerializer,
+    LopHocSerializer, LopHocDetailSerializer,
+    HocVienSerializer, HocVienDetailSerializer,
+    BangDiemSerializer, BangDiemCreateSerializer,
+    DuDoanMLSerializer,
+    PredictInputSerializer, PredictBatchSerializer, PredictManualSerializer,
+)
+
+
+# =============================================================
+#  HELPER: Lấy JWT tokens cho user
+# =============================================================
+
+def get_tokens_for_user(user):
+    """Tạo JWT refresh + access token cho user"""
+    refresh = RefreshToken.for_user(user)
+    return {
+        'refresh': str(refresh),
+        'access': str(refresh.access_token),
+    }
+
+
+# =============================================================
+#  PERMISSION CLASSES
+# =============================================================
+
+class IsAdmin(permissions.BasePermission):
+    """Chỉ Admin mới được truy cập"""
+    def has_permission(self, request, view):
+        return request.user.is_authenticated and request.user.vai_tro == 'admin'
+
+
+class IsAdminOrTeacher(permissions.BasePermission):
+    """Admin hoặc Giáo viên mới được truy cập"""
+    def has_permission(self, request, view):
+        return request.user.is_authenticated and request.user.vai_tro in ['admin', 'teacher']
+
+
+class IsTeacher(permissions.BasePermission):
+    """Chỉ Giáo viên mới được truy cập"""
+    def has_permission(self, request, view):
+        return request.user.is_authenticated and request.user.vai_tro == 'teacher'
+
+
+# =============================================================
+#  AUTH VIEWS
+# =============================================================
+
+class LoginView(APIView):
+    """
+    POST /api/auth/login/
+    Body: { username, password }
+    Returns: { user, access, refresh }
+    """
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        serializer = LoginSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        user = serializer.validated_data['user']
+        tokens = get_tokens_for_user(user)
+
+        return Response({
+            'message': f'Đăng nhập thành công! Chào {user.ho_ten or user.username}',
+            'user': NguoiDungSerializer(user).data,
+            'access': tokens['access'],
+            'refresh': tokens['refresh'],
+        }, status=status.HTTP_200_OK)
+
+
+class RegisterView(APIView):
+    """
+    POST /api/auth/register/
+    Chỉ Admin được tạo tài khoản mới
+    Body: { username, password, email, ho_ten, vai_tro, so_dien_thoai }
+    """
+    permission_classes = [IsAdmin]
+
+    def post(self, request):
+        serializer = RegisterSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        user = serializer.save()
+        return Response({
+            'message': f'Tạo tài khoản thành công!',
+            'user': NguoiDungSerializer(user).data,
+        }, status=status.HTTP_201_CREATED)
+
+
+class MeView(APIView):
+    """
+    GET  /api/auth/me/       — Xem thông tin bản thân
+    PUT  /api/auth/me/       — Cập nhật thông tin bản thân
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        serializer = NguoiDungSerializer(request.user)
+        return Response(serializer.data)
+
+    def put(self, request):
+        serializer = NguoiDungSerializer(
+            request.user, data=request.data, partial=True
+        )
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        serializer.save()
+        return Response(serializer.data)
+
+
+class LogoutView(APIView):
+    """
+    POST /api/auth/logout/
+    Body: { refresh }  — Blacklist refresh token
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        try:
+            refresh_token = request.data.get('refresh')
+            if refresh_token:
+                token = RefreshToken(refresh_token)
+                token.blacklist()
+            return Response({'message': 'Đăng xuất thành công!'})
+        except Exception:
+            return Response({'message': 'Đăng xuất thành công!'})
+
+
+# =============================================================
+#  LOP HOC VIEWS
+# =============================================================
+
+class LopHocListView(APIView):
+    """
+    GET  /api/classes/   — Danh sách lớp học
+    POST /api/classes/   — Tạo lớp mới (Admin)
+    """
+    permission_classes = [IsAdminOrTeacher]
+
+    def get(self, request):
+        user = request.user
+        if user.vai_tro == 'admin':
+            lop_hocs = LopHoc.objects.all()
+        else:
+            # Giáo viên chỉ xem lớp của mình
+            lop_hocs = LopHoc.objects.filter(giao_vien=user)
+
+        serializer = LopHocSerializer(lop_hocs, many=True)
+        return Response({
+            'count': lop_hocs.count(),
+            'results': serializer.data
+        })
+
+    def post(self, request):
+        if request.user.vai_tro != 'admin':
+            return Response(
+                {'error': 'Chỉ Admin mới được tạo lớp học.'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        serializer = LopHocSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        lop = serializer.save()
+        return Response(LopHocSerializer(lop).data, status=status.HTTP_201_CREATED)
+
+
+class LopHocDetailView(APIView):
+    """
+    GET    /api/classes/<id>/   — Chi tiết lớp (kèm danh sách học viên)
+    PUT    /api/classes/<id>/   — Cập nhật lớp (Admin)
+    DELETE /api/classes/<id>/   — Xóa lớp (Admin)
+    """
+    permission_classes = [IsAdminOrTeacher]
+
+    def get_object(self, pk, user):
+        try:
+            lop = LopHoc.objects.get(pk=pk)
+            if user.vai_tro == 'teacher' and lop.giao_vien != user:
+                return None, Response(
+                    {'error': 'Bạn không có quyền xem lớp này.'},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+            return lop, None
+        except LopHoc.DoesNotExist:
+            return None, Response(
+                {'error': 'Lớp học không tồn tại.'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+    def get(self, request, pk):
+        lop, err = self.get_object(pk, request.user)
+        if err:
+            return err
+        serializer = LopHocDetailSerializer(lop)
+        return Response(serializer.data)
+
+    def put(self, request, pk):
+        if request.user.vai_tro != 'admin':
+            return Response({'error': 'Chỉ Admin mới được sửa lớp học.'}, status=status.HTTP_403_FORBIDDEN)
+        lop, err = self.get_object(pk, request.user)
+        if err:
+            return err
+        serializer = LopHocSerializer(lop, data=request.data, partial=True)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        serializer.save()
+        return Response(serializer.data)
+
+    def delete(self, request, pk):
+        if request.user.vai_tro != 'admin':
+            return Response({'error': 'Chỉ Admin mới được xóa lớp học.'}, status=status.HTTP_403_FORBIDDEN)
+        lop, err = self.get_object(pk, request.user)
+        if err:
+            return err
+        lop.delete()
+        return Response({'message': 'Đã xóa lớp học.'}, status=status.HTTP_204_NO_CONTENT)
+
+
+# =============================================================
+#  HOC VIEN VIEWS
+# =============================================================
+
+class HocVienListView(APIView):
+    """
+    GET  /api/students/   — Danh sách học viên
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+        lop_id = request.query_params.get('lop_id')
+
+        if user.vai_tro == 'admin':
+            hoc_viens = HocVien.objects.select_related('nguoi_dung', 'lop').all()
+        elif user.vai_tro == 'teacher':
+            # Giáo viên chỉ xem học viên trong lớp mình dạy
+            lop_ids = LopHoc.objects.filter(giao_vien=user).values_list('id', flat=True)
+            hoc_viens = HocVien.objects.filter(lop__in=lop_ids).select_related('nguoi_dung', 'lop')
+        else:
+            # Học viên chỉ thấy chính mình
+            hoc_viens = HocVien.objects.filter(nguoi_dung=user).select_related('nguoi_dung', 'lop')
+
+        if lop_id:
+            hoc_viens = hoc_viens.filter(lop_id=lop_id)
+
+        serializer = HocVienSerializer(hoc_viens, many=True)
+        return Response({
+            'count': hoc_viens.count(),
+            'results': serializer.data,
+        })
+
+
+class HocVienDetailView(APIView):
+    """
+    GET /api/students/<id>/   — Chi tiết học viên (+ bảng điểm + dự đoán)
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_object(self, pk, user):
+        try:
+            hv = HocVien.objects.select_related('nguoi_dung', 'lop').get(pk=pk)
+            # Student chỉ được xem hồ sơ của chính mình
+            if user.vai_tro == 'student' and hv.nguoi_dung != user:
+                return None, Response({'error': 'Không có quyền truy cập.'}, status=403)
+            # Teacher chỉ xem HS trong lớp mình
+            if user.vai_tro == 'teacher':
+                lop_ids = LopHoc.objects.filter(giao_vien=user).values_list('id', flat=True)
+                if hv.lop_id not in lop_ids:
+                    return None, Response({'error': 'Học viên không thuộc lớp bạn quản lý.'}, status=403)
+            return hv, None
+        except HocVien.DoesNotExist:
+            return None, Response({'error': 'Học viên không tồn tại.'}, status=404)
+
+    def get(self, request, pk):
+        hv, err = self.get_object(pk, request.user)
+        if err:
+            return err
+        serializer = HocVienDetailSerializer(hv)
+        return Response(serializer.data)
+
+
+class HocVienProgressView(APIView):
+    """
+    GET /api/students/<id>/progress/   — Tiến độ chi tiết của học viên
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, pk):
+        try:
+            hv = HocVien.objects.select_related('nguoi_dung', 'lop').get(pk=pk)
+        except HocVien.DoesNotExist:
+            return Response({'error': 'Học viên không tồn tại.'}, status=404)
+
+        bang_diems = BangDiem.objects.filter(hoc_vien=hv).prefetch_related('du_doan')
+        bang_diem_data = BangDiemSerializer(bang_diems, many=True).data
+
+        # Tổng hợp tiến độ
+        progress = {
+            'ma_hoc_vien': hv.ma_hoc_vien,
+            'ho_ten': hv.nguoi_dung.ho_ten,
+            'lop': hv.lop.ten_lop if hv.lop else None,
+            'bang_diem': bang_diem_data,
+            'tong_bai_nop': bang_diems.count(),
+        }
+
+        if bang_diems.exists():
+            latest = bang_diems.first()
+            progress['diem_moi_nhat'] = {
+                'final_score': latest.final_score,
+                'performance_label': latest.performance_label,
+            }
+            if hasattr(latest, 'du_doan') and latest.du_doan:
+                progress['du_doan_moi_nhat'] = DuDoanMLSerializer(latest.du_doan).data
+
+        return Response(progress)
+
+
+# =============================================================
+#  BANG DIEM VIEWS
+# =============================================================
+
+class BangDiemListView(APIView):
+    """
+    GET  /api/scores/   — Danh sách bảng điểm
+    POST /api/scores/   — Giáo viên nhập điểm mới
+    """
+    permission_classes = [IsAdminOrTeacher]
+
+    def get(self, request):
+        user = request.user
+        hoc_vien_id = request.query_params.get('hoc_vien_id')
+        lop_id = request.query_params.get('lop_id')
+
+        bang_diems = BangDiem.objects.select_related(
+            'hoc_vien', 'hoc_vien__nguoi_dung', 'hoc_vien__lop'
+        ).prefetch_related('du_doan')
+
+        if user.vai_tro == 'teacher':
+            lop_ids = LopHoc.objects.filter(giao_vien=user).values_list('id', flat=True)
+            bang_diems = bang_diems.filter(hoc_vien__lop__in=lop_ids)
+
+        if hoc_vien_id:
+            bang_diems = bang_diems.filter(hoc_vien_id=hoc_vien_id)
+        if lop_id:
+            bang_diems = bang_diems.filter(hoc_vien__lop_id=lop_id)
+
+        serializer = BangDiemSerializer(bang_diems, many=True)
+        return Response({'count': bang_diems.count(), 'results': serializer.data})
+
+    def post(self, request):
+        if request.user.vai_tro not in ['admin', 'teacher']:
+            return Response({'error': 'Không có quyền nhập điểm.'}, status=403)
+
+        serializer = BangDiemCreateSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        # Kiểm tra giáo viên có dạy lớp này không
+        hoc_vien_id = serializer.validated_data['hoc_vien'].id
+        if request.user.vai_tro == 'teacher':
+            lop_ids = LopHoc.objects.filter(giao_vien=request.user).values_list('id', flat=True)
+            hv = HocVien.objects.filter(id=hoc_vien_id, lop__in=lop_ids).first()
+            if not hv:
+                return Response(
+                    {'error': 'Học viên không thuộc lớp bạn quản lý.'},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+
+        bang_diem = serializer.save()
+
+        # Tự động chạy ML predict sau khi nhập điểm
+        _auto_predict(bang_diem)
+
+        return Response(
+            BangDiemSerializer(bang_diem).data,
+            status=status.HTTP_201_CREATED
+        )
+
+
+class BangDiemDetailView(APIView):
+    """
+    GET    /api/scores/<id>/   — Chi tiết bảng điểm
+    PUT    /api/scores/<id>/   — Cập nhật điểm (Giáo viên / Admin)
+    DELETE /api/scores/<id>/   — Xóa bảng điểm (Admin)
+    """
+    permission_classes = [IsAdminOrTeacher]
+
+    def get_object(self, pk):
+        try:
+            return BangDiem.objects.select_related(
+                'hoc_vien', 'hoc_vien__nguoi_dung'
+            ).prefetch_related('du_doan').get(pk=pk)
+        except BangDiem.DoesNotExist:
+            return None
+
+    def get(self, request, pk):
+        bd = self.get_object(pk)
+        if not bd:
+            return Response({'error': 'Bảng điểm không tồn tại.'}, status=404)
+        return Response(BangDiemSerializer(bd).data)
+
+    def put(self, request, pk):
+        bd = self.get_object(pk)
+        if not bd:
+            return Response({'error': 'Bảng điểm không tồn tại.'}, status=404)
+
+        serializer = BangDiemCreateSerializer(bd, data=request.data, partial=True)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        bang_diem = serializer.save()
+
+        # Tái dự đoán sau khi cập nhật điểm
+        _auto_predict(bang_diem)
+
+        return Response(BangDiemSerializer(bang_diem).data)
+
+    def delete(self, request, pk):
+        if request.user.vai_tro != 'admin':
+            return Response({'error': 'Chỉ Admin mới được xóa bảng điểm.'}, status=403)
+        bd = self.get_object(pk)
+        if not bd:
+            return Response({'error': 'Bảng điểm không tồn tại.'}, status=404)
+        bd.delete()
+        return Response({'message': 'Đã xóa bảng điểm.'}, status=status.HTTP_204_NO_CONTENT)
+
+
+# =============================================================
+#  ML PREDICT VIEWS
+# =============================================================
+
+def _load_predictor():
+    """Load StudentPredictor từ ml/predict.py — lazy loading"""
+    ml_root = os.path.join(settings.ML_MODEL_DIR, '..', '..')
+    ml_dir = os.path.join(settings.BASE_DIR, '..', 'ml')
+    ml_dir = os.path.abspath(ml_dir)
+    if ml_dir not in sys.path:
+        sys.path.insert(0, ml_dir)
+    from predict import StudentPredictor
+    return StudentPredictor()
+
+
+def _get_model_name():
+    """Đọc tên model thực tế từ model_metadata.json (tránh hardcode)."""
+    import json
+    try:
+        metadata_path = os.path.join(
+            os.path.abspath(os.path.join(settings.BASE_DIR, '..', 'ml')),
+            'saved_models', 'model_metadata.json'
+        )
+        with open(metadata_path, 'r', encoding='utf-8') as f:
+            metadata = json.load(f)
+        return metadata.get('model_name', 'Unknown')
+    except Exception:
+        return 'Unknown'
+
+
+def _auto_predict(bang_diem: BangDiem):
+    """
+    Tự động chạy ML predict và lưu kết quả vào DuDoanML.
+    Được gọi sau khi nhập / cập nhật điểm.
+    """
+    try:
+        predictor = _load_predictor()
+        features = bang_diem.get_features()
+        result = predictor.predict_single(**features)
+
+        proba = result['probabilities']
+        # Upsert DuDoanML (tạo mới hoặc cập nhật nếu đã tồn tại)
+        DuDoanML.objects.update_or_create(
+            bang_diem=bang_diem,
+            defaults={
+                'predicted_label': result['predicted_label'],
+                'prob_weak': proba.get('Weak', 0),
+                'prob_average': proba.get('Average', 0),
+                'prob_good': proba.get('Good', 0),
+                'prob_excellent': proba.get('Excellent', 0),
+                'model_name': _get_model_name(),
+            }
+        )
+    except Exception as e:
+        # Không raise — predict lỗi không ảnh hưởng việc lưu điểm
+        print(f"[WARN] Auto-predict thất bại: {e}")
+
+
+class PredictView(APIView):
+    """
+    POST /api/predict/
+    Dự đoán ML cho 1 bảng điểm đã có trong DB
+    Body: { bang_diem_id: int }
+    """
+    permission_classes = [IsAdminOrTeacher]
+
+    def post(self, request):
+        serializer = PredictInputSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=400)
+
+        bang_diem_id = serializer.validated_data['bang_diem_id']
+        try:
+            bd = BangDiem.objects.select_related('hoc_vien', 'hoc_vien__nguoi_dung').get(pk=bang_diem_id)
+        except BangDiem.DoesNotExist:
+            return Response({'error': 'Bảng điểm không tồn tại.'}, status=404)
+
+        try:
+            predictor = _load_predictor()
+            features = bd.get_features()
+            result = predictor.predict_single(**features)
+        except Exception as e:
+            return Response({'error': f'Lỗi khi dự đoán: {str(e)}'}, status=500)
+
+        proba = result['probabilities']
+        du_doan, created = DuDoanML.objects.update_or_create(
+            bang_diem=bd,
+            defaults={
+                'predicted_label': result['predicted_label'],
+                'prob_weak': proba.get('Weak', 0),
+                'prob_average': proba.get('Average', 0),
+                'prob_good': proba.get('Good', 0),
+                'prob_excellent': proba.get('Excellent', 0),
+                'model_name': _get_model_name(),
+            }
+        )
+
+        return Response({
+            'bang_diem_id': bang_diem_id,
+            'hoc_vien': bd.hoc_vien.ma_hoc_vien,
+            'predicted_label': result['predicted_label'],
+            'final_score': result['final_score'],
+            'probabilities': proba,
+            'risk_level': du_doan.risk_level,
+            'created': created,
+        })
+
+
+class PredictBatchView(APIView):
+    """
+    POST /api/predict/batch/
+    Dự đoán ML cho nhiều bảng điểm cùng lúc
+    Body: { bang_diem_ids: [int, ...] }
+    """
+    permission_classes = [IsAdminOrTeacher]
+
+    def post(self, request):
+        serializer = PredictBatchSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=400)
+
+        ids = serializer.validated_data['bang_diem_ids']
+        try:
+            predictor = _load_predictor()
+        except Exception as e:
+            return Response({'error': f'Không load được model: {str(e)}'}, status=500)
+
+        results = []
+        for bd_id in ids:
+            try:
+                bd = BangDiem.objects.get(pk=bd_id)
+                features = bd.get_features()
+                result = predictor.predict_single(**features)
+                proba = result['probabilities']
+
+                du_doan, _ = DuDoanML.objects.update_or_create(
+                    bang_diem=bd,
+                    defaults={
+                        'predicted_label': result['predicted_label'],
+                        'prob_weak': proba.get('Weak', 0),
+                        'prob_average': proba.get('Average', 0),
+                        'prob_good': proba.get('Good', 0),
+                        'prob_excellent': proba.get('Excellent', 0),
+                        'model_name': _get_model_name(),
+                    }
+                )
+                results.append({
+                    'bang_diem_id': bd_id,
+                    'hoc_vien': bd.hoc_vien.ma_hoc_vien,
+                    'predicted_label': result['predicted_label'],
+                    'risk_level': du_doan.risk_level,
+                    'final_score': result['final_score'],
+                })
+            except BangDiem.DoesNotExist:
+                results.append({'bang_diem_id': bd_id, 'error': 'Không tìm thấy bảng điểm.'})
+            except Exception as e:
+                results.append({'bang_diem_id': bd_id, 'error': str(e)})
+
+        return Response({'count': len(results), 'results': results})
+
+
+class PredictManualView(APIView):
+    """
+    POST /api/predict/manual/
+    Dự đoán thủ công — không cần bảng điểm trong DB
+    Body: { homework_1, homework_2, ..., attendance_rate }
+    """
+    permission_classes = [IsAdminOrTeacher]
+
+    def post(self, request):
+        serializer = PredictManualSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=400)
+
+        try:
+            predictor = _load_predictor()
+            result = predictor.predict_single(**serializer.validated_data)
+        except Exception as e:
+            return Response({'error': f'Lỗi khi dự đoán: {str(e)}'}, status=500)
+
+        risk = predictor.get_risk_level(result['predicted_label'])
+        return Response({
+            'predicted_label': result['predicted_label'],
+            'final_score': result['final_score'],
+            'probabilities': result['probabilities'],
+            'risk_level': risk,
+        })
+
+
+class RetrainView(APIView):
+    """
+    POST /api/admin/retrain/
+    Trigger lại pipeline MLOps (ml_retrain) trong background thread.
+    Chỉ Admin mới được gọi.
+    Trả về ngay lập tức (202 Accepted), pipeline chạy nền.
+    """
+    permission_classes = [IsAdmin]
+
+    def post(self, request):
+        import threading
+        from django.core.management import call_command
+        import io
+
+        # Lưu log vào biến tạm để trả lại kết quả
+        log_output = io.StringIO()
+
+        def run_retrain():
+            try:
+                call_command('ml_retrain', stdout=log_output, stderr=log_output)
+            except Exception as e:
+                log_output.write(f'\n[ERROR] {str(e)}')
+
+        thread = threading.Thread(target=run_retrain, daemon=True)
+        thread.start()
+
+        return Response({
+            'status': 'started',
+            'message': 'MLOps pipeline đã được khởi chạy trong background. Kiểm tra MLflow sau vài phút.'
+        }, status=202)
+
+
+# =============================================================
+#  DU DOAN (PREDICTION HISTORY) VIEWS
+# =============================================================
+
+class DuDoanListView(APIView):
+    """
+    GET /api/predictions/           — Tất cả dự đoán
+    GET /api/predictions/?risk=high_risk  — Lọc theo mức rủi ro
+    """
+    permission_classes = [IsAdminOrTeacher]
+
+    def get(self, request):
+        user = request.user
+        risk = request.query_params.get('risk')
+
+        du_doans = DuDoanML.objects.select_related(
+            'bang_diem', 'bang_diem__hoc_vien', 'bang_diem__hoc_vien__nguoi_dung',
+            'bang_diem__hoc_vien__lop'
+        )
+
+        if user.vai_tro == 'teacher':
+            lop_ids = LopHoc.objects.filter(giao_vien=user).values_list('id', flat=True)
+            du_doans = du_doans.filter(bang_diem__hoc_vien__lop__in=lop_ids)
+
+        if risk:
+            du_doans = du_doans.filter(risk_level=risk)
+
+        serializer = DuDoanMLSerializer(du_doans, many=True)
+        return Response({'count': du_doans.count(), 'results': serializer.data})
+
+
+class WarningListView(APIView):
+    """
+    GET /api/predictions/warnings/   — Danh sách HS cần cảnh báo (high / medium risk)
+    """
+    permission_classes = [IsAdminOrTeacher]
+
+    def get(self, request):
+        user = request.user
+        lop_id = request.query_params.get('lop_id')
+
+        du_doans = DuDoanML.objects.filter(
+            risk_level__in=['high_risk', 'medium_risk']
+        ).select_related(
+            'bang_diem__hoc_vien__nguoi_dung',
+            'bang_diem__hoc_vien__lop'
+        ).order_by('risk_level', '-predicted_at')
+
+        if user.vai_tro == 'teacher':
+            lop_ids = LopHoc.objects.filter(giao_vien=user).values_list('id', flat=True)
+            du_doans = du_doans.filter(bang_diem__hoc_vien__lop__in=lop_ids)
+
+        if lop_id:
+            du_doans = du_doans.filter(bang_diem__hoc_vien__lop_id=lop_id)
+
+        results = []
+        for dd in du_doans:
+            hv = dd.bang_diem.hoc_vien
+            results.append({
+                'hoc_vien_id': hv.id,
+                'ma_hoc_vien': hv.ma_hoc_vien,
+                'ho_ten': hv.nguoi_dung.ho_ten,
+                'lop': hv.lop.ten_lop if hv.lop else None,
+                'predicted_label': dd.predicted_label,
+                'risk_level': dd.risk_level,
+                'final_score': dd.bang_diem.final_score,
+                'predicted_at': dd.predicted_at,
+            })
+
+        return Response({'count': len(results), 'results': results})
+
+
+# =============================================================
+#  DASHBOARD VIEWS
+# =============================================================
+
+class DashboardView(APIView):
+    """
+    GET /api/dashboard/   — Dashboard tổng quan (Admin)
+    """
+    permission_classes = [IsAdmin]
+
+    def get(self, request):
+        tong_hv = HocVien.objects.count()
+        tong_lop = LopHoc.objects.count()
+        tong_gv = NguoiDung.objects.filter(vai_tro='teacher').count()
+        tong_bd = BangDiem.objects.count()
+        tong_dd = DuDoanML.objects.count()
+
+        # Phân bố theo risk_level
+        risk_counts = DuDoanML.objects.values('risk_level').annotate(so_luong=Count('id'))
+        phan_bo_risk = {r['risk_level']: r['so_luong'] for r in risk_counts}
+
+        # Phân bố theo performance_label
+        label_counts = BangDiem.objects.values('performance_label').annotate(so_luong=Count('id'))
+        phan_bo_label = {l['performance_label']: l['so_luong'] for l in label_counts}
+
+        # HS cần cảnh báo (high_risk)
+        canh_bao = DuDoanML.objects.filter(risk_level='high_risk').select_related(
+            'bang_diem__hoc_vien__nguoi_dung',
+            'bang_diem__hoc_vien__lop'
+        )[:10]
+        hv_canh_bao = [
+            {
+                'ma_hoc_vien': dd.bang_diem.hoc_vien.ma_hoc_vien,
+                'ho_ten': dd.bang_diem.hoc_vien.nguoi_dung.ho_ten,
+                'lop': dd.bang_diem.hoc_vien.lop.ten_lop if dd.bang_diem.hoc_vien.lop else None,
+                'final_score': dd.bang_diem.final_score,
+                'risk_level': dd.risk_level,
+            }
+            for dd in canh_bao
+        ]
+
+        return Response({
+            'tong_hoc_vien': tong_hv,
+            'tong_lop_hoc': tong_lop,
+            'tong_giao_vien': tong_gv,
+            'tong_bang_diem': tong_bd,
+            'tong_du_doan': tong_dd,
+            'phan_bo_risk': phan_bo_risk,
+            'phan_bo_label': phan_bo_label,
+            'hoc_vien_canh_bao': hv_canh_bao,
+        })
+
+
+class DashboardClassView(APIView):
+    """
+    GET /api/dashboard/class/<id>/   — Dashboard 1 lớp học (Admin, Teacher)
+    """
+    permission_classes = [IsAdminOrTeacher]
+
+    def get(self, request, pk):
+        try:
+            lop = LopHoc.objects.get(pk=pk)
+        except LopHoc.DoesNotExist:
+            return Response({'error': 'Lớp học không tồn tại.'}, status=404)
+
+        # Teacher chỉ xem lớp mình dạy
+        if request.user.vai_tro == 'teacher' and lop.giao_vien != request.user:
+            return Response({'error': 'Không có quyền xem lớp này.'}, status=403)
+
+        hoc_viens = HocVien.objects.filter(lop=lop)
+        bang_diems = BangDiem.objects.filter(hoc_vien__lop=lop)
+        du_doans = DuDoanML.objects.filter(bang_diem__hoc_vien__lop=lop)
+
+        # Thống kê điểm
+        avg_score = bang_diems.aggregate(avg=Avg('final_score'))['avg'] or 0
+
+        # Phân bố label
+        label_counts = bang_diems.values('performance_label').annotate(so_luong=Count('id'))
+        phan_bo_label = {l['performance_label']: l['so_luong'] for l in label_counts}
+
+        # Phân bố risk
+        risk_counts = du_doans.values('risk_level').annotate(so_luong=Count('id'))
+        phan_bo_risk = {r['risk_level']: r['so_luong'] for r in risk_counts}
+
+        # HS yếu cần cảnh báo
+        canh_bao_ids = du_doans.filter(risk_level='high_risk').values_list('bang_diem__hoc_vien_id', flat=True)
+        ds_canh_bao = hoc_viens.filter(id__in=canh_bao_ids)
+
+        return Response({
+            'lop_id': lop.id,
+            'ten_lop': lop.ten_lop,
+            'giao_vien': lop.giao_vien.ho_ten if lop.giao_vien else None,
+            'nam_hoc': lop.nam_hoc,
+            'hoc_ky': lop.hoc_ky,
+            'tong_hoc_vien': hoc_viens.count(),
+            'tong_bang_diem': bang_diems.count(),
+            'diem_trung_binh': round(avg_score, 2),
+            'phan_bo_label': phan_bo_label,
+            'phan_bo_risk': phan_bo_risk,
+            'so_hs_canh_bao': ds_canh_bao.count(),
+            'ds_hoc_vien': HocVienSerializer(hoc_viens, many=True).data,
+        })

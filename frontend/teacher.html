@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Teacher Dashboard — EWS Platform</title>
+  <link rel="stylesheet" href="css/style.css"/>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body>
+<div class="app-layout">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <h2>EWS Platform</h2>
+      <span>ML Powered</span>
+    </div>
+    
+    <nav class="sidebar-nav">
+      <div class="nav-item active" onclick="showSection('myclass')" id="nav-myclass">
+        <span class="icon">📊</span> Dashboard
+      </div>
+      <div class="nav-item" onclick="showSection('students')" id="nav-students">
+        <span class="icon">🎓</span> My Students
+      </div>
+      <div class="nav-item" onclick="showSection('myclasses')" id="nav-myclasses">
+        <span class="icon">🏫</span> My Classes
+      </div>
+      <div class="nav-item" onclick="showSection('analytics')" id="nav-analytics">
+        <span class="icon">📈</span> Analytics
+      </div>
+    </nav>
+
+    <div class="sidebar-footer">
+      <div class="sidebar-user-mini">
+        <div class="user-avatar-mini" id="avatarText">T</div>
+        <div class="user-info-mini">
+          <div class="name" id="sidebarName">Teacher</div>
+          <div class="status">Online</div>
+        </div>
+      </div>
+      <button class="btn-logout" onclick="api.logout()">Logout</button>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="main-content">
+    <div class="topbar">
+      <div class="topbar-search">
+        <span class="icon">🔍</span>
+        <input type="text" placeholder="Search students, classes, or reports..."/>
+      </div>
+      <div class="topbar-actions">
+        <select id="lopSelector" class="form-control" style="max-width:200px" onchange="onClassChange()">
+          <option value="">Loading classes...</option>
+        </select>
+        <div class="notif-btn">
+          🔔 <span class="notif-badge">5</span>
+        </div>
+        <div class="top-user">
+          <div class="avatar">T</div>
+          <div class="name" id="topUserName">Dr. teacher</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="page-content">
+      <div class="page-header">
+        <h1 id="pageTitle">Teacher Dashboard</h1>
+        <p id="pageDesc">Monitor and manage student performance</p>
+      </div>
+
+      <!-- ═══ DASHBOARD ═══ -->
+      <div id="sec-myclass" class="section active">
+        <!-- Stats -->
+        <div class="stats-grid" id="classStats">
+            <!-- Populated dynamically -->
+        </div>
+
+        <div id="atRiskAlert" class="alert-at-risk" style="display:none">
+            <span class="icon">⚠️</span>
+            <span id="atRiskText">1 student in this class is at high risk of failing. Immediate intervention recommended.</span>
+        </div>
+
+        <div class="card">
+          <div class="card-title" id="classPerfTitle">Student Performance - Mathematics 101</div>
+          <p style="font-size:12px; color:var(--text-secondary); margin-bottom:16px;">Click on scores to edit and trigger AI prediction</p>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Student Name</th><th>Assignments</th><th>Midterm</th><th>Final</th><th>Overall</th><th>Risk Level</th>
+                </tr>
+              </thead>
+              <tbody id="studentScoreTable">
+                <tr><td colspan="6" style="text-align:center"><div class="spinner"></div></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="grid-2">
+            <div class="card">
+                <div class="card-title">Grade Distribution</div>
+                <div class="chart-container"><canvas id="chartLabel"></canvas></div>
+            </div>
+            <div class="card">
+                <div class="card-title">Risk Analysis</div>
+                <div class="chart-container"><canvas id="chartRisk"></canvas></div>
+            </div>
+        </div>
+      </div>
+
+      <!-- ═══ MY CLASSES ═══ -->
+      <div id="sec-myclasses" class="section">
+          <div class="card">
+              <div class="card-title">Your Assigned Classes</div>
+              <div class="table-wrap">
+                  <table>
+                      <thead>
+                          <tr><th>Class Name</th><th>Year</th><th>Semester</th><th>Students</th><th>Status</th></tr>
+                      </thead>
+                      <tbody id="myClassesTable"></tbody>
+                  </table>
+              </div>
+          </div>
+      </div>
+
+    </div>
+  </main>
+</div>
+
+<!-- MODAL FOR EDITING SCORE -->
+<div class="modal-overlay" id="scoreModal">
+    <div class="modal modal-lg">
+      <div class="modal-header">
+        <h2 id="modalStudentName">Edit Grades</h2>
+        <span class="modal-close" onclick="closeScoreModal()">✕</span>
+      </div>
+      <form id="scoreForm">
+        <input type="hidden" id="editScoreId" name="score_id"/>
+        <input type="hidden" id="editHvId" name="hoc_vien"/>
+        <div class="form-grid-3">
+          <div class="form-group"><label class="form-label">HW1</label><input name="homework_1" id="f_hw1" type="number" class="form-control" step="0.1"/></div>
+          <div class="form-group"><label class="form-label">HW2</label><input name="homework_2" id="f_hw2" type="number" class="form-control" step="0.1"/></div>
+          <div class="form-group"><label class="form-label">HW3</label><input name="homework_3" id="f_hw3" type="number" class="form-control" step="0.1"/></div>
+          <div class="form-group"><label class="form-label">Quiz1</label><input name="quiz_1" id="f_q1" type="number" class="form-control" step="0.1"/></div>
+          <div class="form-group"><label class="form-label">Quiz2</label><input name="quiz_2" id="f_q2" type="number" class="form-control" step="0.1"/></div>
+          <div class="form-group"><label class="form-label">Midterm</label><input name="midterm_score" id="f_gk" type="number" class="form-control" step="0.1"/></div>
+          <div class="form-group"><label class="form-label">Final</label><input name="final_exam" id="f_ck" type="number" class="form-control" step="0.1"/></div>
+          <div class="form-group"><label class="form-label">Attendance</label><input name="attendance_rate" id="f_cc" type="number" class="form-control" step="0.01"/></div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline" onclick="closeScoreModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save & Predict</button>
+        </div>
+      </form>
+    </div>
+</div>
+
+<script src="js/api.js"></script>
+<script>
+const user = requireAuth(['teacher']);
+if (user) {
+  document.getElementById('sidebarName').textContent = user.ho_ten || user.username;
+  document.getElementById('topUserName').textContent = 'Dr. ' + (user.ho_ten || user.username);
+  document.getElementById('avatarText').textContent  = (user.ho_ten || user.username)[0].toUpperCase();
+}
+
+let myClasses = [], allScores = [];
+let currentClassId = null;
+let chartLabel, chartRisk;
+
+async function initClasses() {
+  const resp = await api.get('/classes/');
+  if (!resp || !resp.ok) return;
+  const d = await resp.json();
+  myClasses = d.results || [];
+  const sel = document.getElementById('lopSelector');
+  if (!myClasses.length) {
+    sel.innerHTML = '<option value="">No classes yet</option>';
+    return;
+  }
+  sel.innerHTML = myClasses.map(c => `<option value="${c.id}">${c.ten_lop}</option>`).join('');
+  currentClassId = myClasses[0].id;
+  loadClassDashboard();
+}
+
+function onClassChange() {
+  currentClassId = document.getElementById('lopSelector').value;
+  loadClassDashboard();
+}
+
+async function loadClassDashboard() {
+  if (!currentClassId) return;
+  const resp = await api.get(`/dashboard/class/${currentClassId}/`);
+  if (!resp || !resp.ok) return;
+  const d = await resp.json();
+
+  document.getElementById('classPerfTitle').textContent = `Student Performance - ${d.ten_lop}`;
+  
+  document.getElementById('classStats').innerHTML = `
+    <div class="stat-card blue">
+        <div><div class="label">Total Students</div><div class="value">${d.tong_hoc_vien}</div></div>
+        <div class="stat-icon-wrapper">🎓</div>
+    </div>
+    <div class="stat-card green">
+        <div><div class="label">Class Average</div><div class="value">${d.diem_trung_binh}%</div></div>
+        <div class="stat-icon-wrapper">📊</div>
+    </div>
+    <div class="stat-card red">
+        <div><div class="label">At Risk</div><div class="value">${d.so_hs_canh_bao}</div></div>
+        <div class="stat-icon-wrapper">📉</div>
+    </div>
+  `;
+
+  if (d.so_hs_canh_bao > 0) {
+      document.getElementById('atRiskAlert').style.display = 'flex';
+      document.getElementById('atRiskText').textContent = `${d.so_hs_canh_bao} student${d.so_hs_canh_bao > 1 ? 's' : ''} in this class ${d.so_hs_canh_bao > 1 ? 'are' : 'is'} at high risk of failing. Immediate intervention recommended.`;
+  } else {
+      document.getElementById('atRiskAlert').style.display = 'none';
+  }
+
+  // Load scores table
+  loadStudentScores();
+  
+  // Update charts
+  updateCharts(d);
+}
+
+async function loadStudentScores() {
+  const resp = await api.get(`/scores/?lop_id=${currentClassId}`);
+  const d = await resp.json();
+  allScores = d.results;
+  document.getElementById('studentScoreTable').innerHTML = allScores.map(r => `
+    <tr onclick="openScoreModal(${r.id})" style="cursor:pointer">
+      <td><strong>${r.hoc_vien_ten}</strong></td>
+      <td>${((r.homework_1+r.homework_2+r.homework_3)/3).toFixed(1)}%</td>
+      <td>${r.midterm_score.toFixed(1)}%</td>
+      <td>${r.final_exam.toFixed(1)}%</td>
+      <td><strong>${r.final_score.toFixed(1)}%</strong></td>
+      <td>${r.du_doan ? getRiskBadge(r.du_doan.risk_level) : '—'}</td>
+    </tr>
+  `).join('');
+}
+
+function updateCharts(d) {
+    const labelMap = { Excellent:'Excellent', Good:'Good', Average:'Average', Weak:'Weak' };
+    const lKeys = Object.keys(d.phan_bo_label);
+    if (chartLabel) chartLabel.destroy();
+    chartLabel = new Chart(document.getElementById('chartLabel'), {
+        type: 'doughnut',
+        data: {
+          labels: lKeys.map(k => labelMap[k]||k),
+          datasets: [{ data: lKeys.map(k => d.phan_bo_label[k]), backgroundColor: ['#A855F7', '#22C55E', '#3B82F6', '#EF4444'], borderWidth: 0 }]
+        },
+        options: { cutout: '70%', plugins: { legend: { position: 'bottom' } } }
+    });
+
+    if (chartRisk) chartRisk.destroy();
+    chartRisk = new Chart(document.getElementById('chartRisk'), {
+        type: 'bar',
+        data: {
+            labels: ['Excellent', 'Good', 'Average', 'At Risk'],
+            datasets: [{
+                data: [d.phan_bo_label.Excellent||0, d.phan_bo_label.Good||0, d.phan_bo_label.Average||0, d.phan_bo_label.Weak||0],
+                backgroundColor: ['#A855F7', '#22C55E', '#3B82F6', '#EF4444']
+            }]
+        },
+        options: { plugins: { legend: { display: false } } }
+    });
+}
+
+function showSection(name) {
+    document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+    document.getElementById('sec-' + name)?.classList.add('active');
+    document.getElementById('nav-' + name)?.classList.add('active');
+    
+    if (name === 'myclasses') {
+        document.getElementById('myClassesTable').innerHTML = myClasses.map(c => `
+            <tr>
+                <td><strong>${c.ten_lop}</strong></td><td>${c.nam_hoc}</td><td>${c.hoc_ky}</td>
+                <td>${c.so_hoc_vien}</td>
+                <td><span class="badge ${c.is_active ? 'badge-green' : 'badge-orange'}">${c.is_active ? 'Active' : 'Archived'}</span></td>
+            </tr>
+        `).join('');
+    }
+}
+
+function openScoreModal(scoreId) {
+    const s = allScores.find(x => x.id === scoreId);
+    if (!s) return;
+    document.getElementById('modalStudentName').textContent = `Grades - ${s.hoc_vien_ten}`;
+    document.getElementById('editScoreId').value = s.id;
+    document.getElementById('editHvId').value = s.hoc_vien;
+    document.getElementById('f_hw1').value = s.homework_1;
+    document.getElementById('f_hw2').value = s.homework_2;
+    document.getElementById('f_hw3').value = s.homework_3;
+    document.getElementById('f_q1').value = s.quiz_1;
+    document.getElementById('f_q2').value = s.quiz_2;
+    document.getElementById('f_gk').value = s.midterm_score;
+    document.getElementById('f_ck').value = s.final_exam;
+    document.getElementById('f_cc').value = s.attendance_rate;
+    document.getElementById('scoreModal').classList.add('open');
+}
+
+function closeScoreModal() { document.getElementById('scoreModal').classList.remove('open'); }
+
+document.getElementById('scoreForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const payload = {};
+    fd.forEach((v, k) => { if (k!=='score_id') payload[k] = parseFloat(v); });
+    const scoreId = document.getElementById('editScoreId').value;
+    
+    const resp = await api.put(`/scores/${scoreId}/`, payload);
+    if (resp.ok) {
+        showToast('Grades updated successfully');
+        closeScoreModal();
+        loadClassDashboard();
+    } else {
+        showToast('Error updating grades', 'error');
+    }
+});
+
+initClasses();
+</script>
+</body>
+</html>

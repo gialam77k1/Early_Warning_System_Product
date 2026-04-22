@@ -1,0 +1,63 @@
+# ============================================================
+#  Early Warning System — .gitignore
+# ============================================================
+
+# ── Tài liệu nội bộ (không public) ─────────────────────────
+Charts/
+Cac_buoc_thuc_hien/
+project.md
+RENDER_DEPLOY_GUIDE.md
+
+# ── ML: model đã train (file lớn, không push lên git) ───────
+ml/saved_models/
+ml/reports/
+mlruns/
+
+# ── Python ──────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# ── Virtual Environment ──────────────────────────────────────
+venv/
+.venv/
+env/
+ENV/
+
+# ── Django ───────────────────────────────────────────────────
+*.log
+*.pot
+db.sqlite3
+media/
+
+# ── Environment & Secrets ────────────────────────────────────
+.env
+.env.*
+!.env.example
+
+# ── Jupyter Notebook ─────────────────────────────────────────
+.ipynb_checkpoints/
+*.ipynb
+
+# ── IDE & Editor ─────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# ── Docker ───────────────────────────────────────────────────
+# (giữ docker-compose.yml và Dockerfile trong repo)
+
+# ── Node (nếu có) ────────────────────────────────────────────
+node_modules/
+
+# ── Gemini / AI tools ────────────────────────────────────────
+.gemini/

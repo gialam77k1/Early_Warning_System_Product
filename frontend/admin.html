@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Admin Dashboard — EWS Platform</title>
+  <link rel="stylesheet" href="css/style.css"/>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body>
+<div class="app-layout">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-logo">
+      <h2>EWS Platform</h2>
+      <span>ML Powered Prediction</span>
+    </div>
+    
+    <nav class="sidebar-nav">
+      <div class="nav-item active" onclick="showSection('dashboard')" id="nav-dashboard">
+        <span class="icon">📊</span> Dashboard
+      </div>
+      <div class="nav-item" onclick="showSection('students')" id="nav-students">
+        <span class="icon">🎓</span> Students
+      </div>
+      <div class="nav-item" onclick="showSection('teachers')" id="nav-teachers">
+        <span class="icon">👨‍🏫</span> Teachers
+      </div>
+      <div class="nav-item" onclick="showSection('classes')" id="nav-classes">
+        <span class="icon">🏫</span> Classes
+      </div>
+      <div class="nav-item" onclick="showSection('scores')" id="nav-scores">
+        <span class="icon">📝</span> Gradebook
+      </div>
+      <div class="nav-item" onclick="showSection('warnings')" id="nav-warnings">
+        <span class="icon">⚠️</span> Warnings
+      </div>
+      <div class="nav-item" onclick="showSection('predictions')" id="nav-predictions">
+        <span class="icon">🤖</span> AI Analytics
+      </div>
+      <div class="nav-item" onclick="showSection('mlops')" id="nav-mlops">
+        <span class="icon">⚡</span> MLOps
+      </div>
+      <div class="nav-item" onclick="showSection('settings')" id="nav-settings">
+        <span class="icon">⚙️</span> Settings
+      </div>
+    </nav>
+
+    <div class="sidebar-footer">
+      <div class="sidebar-user-mini">
+        <div class="user-avatar-mini" id="avatarText">A</div>
+        <div class="user-info-mini">
+          <div class="name" id="sidebarName">Admin</div>
+          <div class="status">Online</div>
+        </div>
+      </div>
+      <button class="btn-logout" onclick="api.logout()">Logout</button>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="main-content">
+    <div class="topbar">
+      <div class="topbar-search">
+        <span class="icon">🔍</span>
+        <input type="text" placeholder="Search students, classes, or reports..."/>
+      </div>
+      <div class="topbar-actions">
+        <div class="notif-btn">
+          🔔 <span class="notif-badge">3</span>
+        </div>
+        <div class="top-user">
+          <div class="avatar">A</div>
+          <div class="name">Admin User</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="page-content">
+      <div class="page-header">
+        <h1 id="pageTitle">Admin Dashboard</h1>
+        <p id="pageDesc">Overview of student performance and risk assessment</p>
+      </div>
+
+      <!-- ═══ DASHBOARD ═══ -->
+      <div id="sec-dashboard" class="section active">
+        <!-- Stats -->
+        <div class="stats-grid" id="statsGrid">
+          <!-- Dynamically populated -->
+        </div>
+
+        <div class="grid-2">
+          <div class="card">
+            <div class="card-title">Performance Distribution</div>
+            <div class="chart-container">
+              <canvas id="chartLabel"></canvas>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-title">Risk Distribution by Class</div>
+            <div class="chart-container">
+              <canvas id="chartRisk"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">At-Risk Students</div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Student Name</th><th>Class</th><th>Overall</th><th>Risk Level</th>
+                </tr>
+              </thead>
+              <tbody id="warnTable">
+                <tr><td colspan="4" style="text-align:center">Loading data...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══ CLASSES ═══ -->
+      <div id="sec-classes" class="section">
+        <div class="card">
+            <div class="modal-header">
+                <h2>Manage Classes</h2>
+                <button class="btn btn-primary btn-sm" onclick="openClassModal()">+ New Class</button>
+            </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr><th>Class Name</th><th>Teacher</th><th>Year</th><th>Students</th><th>Status</th><th>Actions</th></tr>
+              </thead>
+              <tbody id="classTable"><tr><td colspan="6" style="text-align:center"><div class="spinner"></div></td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══ STUDENTS ═══ -->
+      <div id="sec-students" class="section">
+        <div class="card">
+            <div class="card-title">Student Directory</div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr><th>ID</th><th>Name</th><th>Email</th><th>Class</th><th>Gender</th><th>Actions</th></tr>
+              </thead>
+              <tbody id="studentTable"><tr><td colspan="6" style="text-align:center"><div class="spinner"></div></td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══ GRADEBOOK ═══ -->
+      <div id="sec-scores" class="section">
+        <div class="card">
+          <div class="modal-header">
+              <h2>Gradebook</h2>
+              <button class="btn btn-primary btn-sm" onclick="openScoreModal()">+ Enter Grade</button>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Student</th><th>HW Avg</th><th>Quiz Avg</th><th>Midterm</th><th>Final</th><th>Overall</th><th>Risk Level</th>
+                </tr>
+              </thead>
+              <tbody id="scoreTable"><tr><td colspan="7" style="text-align:center"><div class="spinner"></div></td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══ WARNINGS ═══ -->
+      <div id="sec-warnings" class="section">
+        <div class="alert-at-risk">
+            <span class="icon">⚠️</span>
+            <span>Multiple students identified with high failure risk. Immediate intervention recommended.</span>
+        </div>
+        <div class="card">
+          <div class="card-title">Critical Alerts</div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr><th>ID</th><th>Name</th><th>Class</th><th>Overall</th><th>Prediction</th><th>Risk Level</th></tr>
+              </thead>
+              <tbody id="warningTable"><tr><td colspan="6" style="text-align:center"><div class="spinner"></div></td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══ PREDICTIONS ═══ -->
+      <div id="sec-predictions" class="section">
+        <div class="grid-2">
+          <div class="card">
+            <div class="card-title">Quick AI Prediction</div>
+            <form id="manualPredictForm">
+              <div class="form-grid-2">
+                <div class="form-group"><label class="form-label">HW1</label><input name="homework_1" type="number" class="form-control" value="7" step="0.1"/></div>
+                <div class="form-group"><label class="form-label">HW2</label><input name="homework_2" type="number" class="form-control" value="7" step="0.1"/></div>
+                <div class="form-group"><label class="form-label">Quiz1</label><input name="quiz_1" type="number" class="form-control" value="7" step="0.1"/></div>
+                <div class="form-group"><label class="form-label">Midterm</label><input name="midterm_score" type="number" class="form-control" value="7" step="0.1"/></div>
+                <div class="form-group"><label class="form-label">Final</label><input name="final_exam" type="number" class="form-control" value="7" step="0.1"/></div>
+                <div class="form-group"><label class="form-label">Attendance</label><input name="attendance_rate" type="number" class="form-control" value="0.9" step="0.01"/></div>
+              </div>
+              <button type="submit" class="btn btn-primary" style="width:100%">Run Prediction</button>
+            </form>
+            <div id="manualResult" style="margin-top:20px"></div>
+          </div>
+          <div class="card">
+            <div class="card-title">Prediction Probabilities</div>
+            <div class="chart-container">
+              <canvas id="chartPredict"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══ MLOPS ═══ -->
+      <div id="sec-mlops" class="section">
+
+        <!-- Status Cards -->
+        <div class="stats-grid" style="grid-template-columns: repeat(3,1fr)">
+          <div class="stat-card blue">
+            <div>
+              <div class="label">Model Status</div>
+              <div class="value" id="mlModelStatus">Loading...</div>
+            </div>
+            <div class="stat-icon-wrapper">🤖</div>
+          </div>
+          <div class="stat-card green">
+            <div>
+              <div class="label">Last F1-Score</div>
+              <div class="value" id="mlF1Score">—</div>
+            </div>
+            <div class="stat-icon-wrapper">📊</div>
+          </div>
+          <div class="stat-card purple">
+            <div>
+              <div class="label">Last Retrain</div>
+              <div class="value" id="mlLastRun">—</div>
+            </div>
+            <div class="stat-icon-wrapper">🕒</div>
+          </div>
+        </div>
+
+        <div class="grid-2">
+          <!-- Trigger Card -->
+          <div class="card">
+            <div class="card-title">🚀 Trigger Retraining Pipeline</div>
+            <p style="font-size:14px; color:var(--text-secondary); margin-bottom:20px;">
+              Kích hoạt quy trình MLOps: kiểm tra drift, kết hợp dữ liệu cũ + mới,
+              huấn luyện 3 models (XGBoost, RF, LR), so sánh Champion vs Challenger
+              và quyết định cập nhật model production.
+            </p>
+            <div style="background:#F0F9FF; border:1px solid #BAE6FD; border-radius:8px; padding:16px; margin-bottom:20px; font-size:13px; color:#0369A1;">
+              ⏱️ Pipeline thường mất <strong>2-5 phút</strong>. Trang này không cần chờ — kiểm tra kết quả sau.
+            </div>
+            <button class="btn btn-primary" id="retrainBtn" onclick="triggerRetrain()" style="width:100%; padding:14px; font-size:15px;">
+              ⚡ Run MLOps Pipeline
+            </button>
+            <div id="retrainStatus" style="margin-top:16px; display:none;"></div>
+          </div>
+
+          <!-- Last Run Result -->
+          <div class="card">
+            <div class="card-title">📋 Last Retrain Result</div>
+            <div id="lastRetrainResult">
+              <div style="text-align:center; color:var(--text-muted); padding:40px 0;">
+                No result yet. Run the pipeline first.
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- How it works -->
+        <div class="card">
+          <div class="card-title">🔬 How MLOps Pipeline Works</div>
+          <div style="display:grid; grid-template-columns: repeat(4,1fr); gap:20px; text-align:center;">
+            <div style="padding:16px;">
+              <div style="font-size:32px; margin-bottom:8px;">📥</div>
+              <div style="font-weight:700; font-size:13px;">Step 1</div>
+              <div style="font-size:12px; color:var(--text-secondary);">Load dữ liệu gốc + dữ liệu mới từ DB</div>
+            </div>
+            <div style="padding:16px;">
+              <div style="font-size:32px; margin-bottom:8px;">🔍</div>
+              <div style="font-weight:700; font-size:13px;">Step 2</div>
+              <div style="font-size:12px; color:var(--text-secondary);">Kiểm tra Data Drift</div>
+            </div>
+            <div style="padding:16px;">
+              <div style="font-size:32px; margin-bottom:8px;">🏆</div>
+              <div style="font-weight:700; font-size:13px;">Step 3</div>
+              <div style="font-size:12px; color:var(--text-secondary);">So sánh Champion vs Challenger</div>
+            </div>
+            <div style="padding:16px;">
+              <div style="font-size:32px; margin-bottom:8px;">✅</div>
+              <div style="font-weight:700; font-size:13px;">Step 4</div>
+              <div style="font-size:12px; color:var(--text-secondary);">Cập nhật model nếu tốt hơn</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+</div>
+
+<!-- MODALS -->
+<div class="modal-overlay" id="classModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>Add New Class</h2>
+      <span class="modal-close" onclick="closeClassModal()">✕</span>
+    </div>
+    <form id="classForm">
+      <div class="form-group">
+        <label class="form-label">Class Name</label>
+        <input name="ten_lop" type="text" class="form-control" required/>
+      </div>
+      <div class="form-grid-2">
+        <div class="form-group"><label class="form-label">Year</label><input name="nam_hoc" type="text" class="form-control" value="2025-2026"/></div>
+        <div class="form-group"><label class="form-label">Semester</label><select name="hoc_ky" class="form-control"><option value="1">1</option><option value="2">2</option></select></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline" onclick="closeClassModal()">Cancel</button>
+        <button type="submit" class="btn btn-primary">Save Class</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="modal-overlay" id="scoreModal">
+  <div class="modal modal-lg">
+    <div class="modal-header">
+      <h2>Enter Student Grades</h2>
+      <span class="modal-close" onclick="closeScoreModal()">✕</span>
+    </div>
+    <form id="scoreForm">
+      <!-- Form fields... simplified for style change -->
+      <div class="form-group">
+        <label class="form-label">Học viên</label>
+        <select name="hoc_vien" id="studentSelect" class="form-control" required></select>
+      </div>
+      <div class="form-grid-3">
+        <div class="form-group"><label class="form-label">HW1</label><input name="homework_1" type="number" class="form-control" step="0.1" required/></div>
+        <div class="form-group"><label class="form-label">HW2</label><input name="homework_2" type="number" class="form-control" step="0.1" required/></div>
+        <div class="form-group"><label class="form-label">HW3</label><input name="homework_3" type="number" class="form-control" step="0.1" required/></div>
+        <div class="form-group"><label class="form-label">Quiz1</label><input name="quiz_1" type="number" class="form-control" step="0.1" required/></div>
+        <div class="form-group"><label class="form-label">Quiz2</label><input name="quiz_2" type="number" class="form-control" step="0.1" required/></div>
+        <div class="form-group"><label class="form-label">Midterm</label><input name="midterm_score" type="number" class="form-control" step="0.1" required/></div>
+        <div class="form-group"><label class="form-label">Final</label><input name="final_exam" type="number" class="form-control" step="0.1" required/></div>
+        <div class="form-group"><label class="form-label">Attendance</label><input name="attendance_rate" type="number" class="form-control" step="0.01" required/></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline" onclick="closeScoreModal()">Cancel</button>
+        <button type="submit" class="btn btn-primary">Save & Predict</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script src="js/api.js"></script>
+<script>
+  const user = requireAuth(['admin']);
+  if (user) {
+    document.getElementById('sidebarName').textContent = user.ho_ten || user.username;
+    document.getElementById('avatarText').textContent  = (user.ho_ten || user.username)[0].toUpperCase();
+  }
+
+  let chartLabel, chartRisk, chartPredict;
+
+  const sectionConfig = {
+    dashboard:   { title: 'Admin Dashboard', desc: 'System-wide academic performance overview', load: loadDashboard },
+    classes:     { title: 'Manage Classes',  desc: 'Create and monitor class groups', load: loadClasses },
+    students:    { title: 'Students',        desc: 'Manage student accounts', load: loadStudents },
+    scores:      { title: 'Gradebook',       desc: 'Raw scores and assessment data', load: loadScores },
+    warnings:    { title: 'Warnings',        desc: 'At-risk students needing intervention', load: loadWarnings },
+    predictions: { title: 'AI Analytics',    desc: 'Deep learning performance prediction', load: loadDashboard },
+    mlops:       { title: 'MLOps Dashboard', desc: 'Manage and trigger ML retraining pipeline', load: loadMlops },
+  };
+
+  function showSection(name) {
+    document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+    document.getElementById('sec-' + name)?.classList.add('active');
+    document.getElementById('nav-' + name)?.classList.add('active');
+    const cfg = sectionConfig[name];
+    if (cfg) {
+      document.getElementById('pageTitle').textContent = cfg.title;
+      document.getElementById('pageDesc').textContent  = cfg.desc;
+      cfg.load();
+    }
+  }
+
+  async function loadDashboard() {
+    const resp = await api.get('/dashboard/');
+    if (!resp || !resp.ok) return;
+    const d = await resp.json();
+
+    document.getElementById('statsGrid').innerHTML = `
+      <div class="stat-card blue">
+        <div><div class="label">Total Students</div><div class="value">${d.tong_hoc_vien}</div></div>
+        <div class="stat-icon-wrapper">🎓</div>
+      </div>
+      <div class="stat-card purple">
+        <div><div class="label">Total Teachers</div><div class="value">${d.tong_giao_vien}</div></div>
+        <div class="stat-icon-wrapper">👨‍🏫</div>
+      </div>
+      <div class="stat-card pink">
+        <div><div class="label">Total Classes</div><div class="value">${d.tong_lop_hoc}</div></div>
+        <div class="stat-icon-wrapper">🏫</div>
+      </div>
+      <div class="stat-card green">
+        <div><div class="label">Avg Performance</div><div class="value">${d.diem_trung_binh_he_thong || '74.2'}%</div></div>
+        <div class="stat-icon-wrapper">📈</div>
+      </div>
+    `;
+
+    // Charts
+    if (chartLabel) chartLabel.destroy();
+    chartLabel = new Chart(document.getElementById('chartLabel'), {
+       type: 'doughnut',
+       data: {
+         labels: ['Excellent', 'Good', 'Average', 'Weak'],
+         datasets: [{
+           data: [d.phan_bo_label.Excellent||0, d.phan_bo_label.Good||0, d.phan_bo_label.Average||0, d.phan_bo_label.Weak||0],
+           backgroundColor: ['#22C55E', '#3B82F6', '#F59E0B', '#EF4444'],
+           borderWidth: 0
+         }]
+       },
+       options: { cutout: '70%', plugins: { legend: { position: 'bottom' } } }
+    });
+
+    if (chartRisk) chartRisk.destroy();
+    chartRisk = new Chart(document.getElementById('chartRisk'), {
+      type: 'bar',
+      data: {
+        labels: ['Math 101', 'Physics 201', 'Chemistry 301'],
+        datasets: [
+          { label: 'Good', data: [0.9, 0.2, 0.8], backgroundColor: '#3B82F6' },
+          { label: 'Average', data: [0.7, 0.4, 0.6], backgroundColor: '#F59E0B' },
+          { label: 'At Risk', data: [1.0, 1.0, 1.0], backgroundColor: '#EF4444' }
+        ]
+      },
+      options: { scales: { y: { beginAtZero: true, max: 1 } }, plugins: { legend: { position: 'bottom' } } }
+    });
+
+    // Warning table
+    const warn = d.hoc_vien_canh_bao;
+    document.getElementById('warnTable').innerHTML = (warn.length ? warn.map(w => `
+      <tr>
+        <td><strong>${w.ho_ten}</strong></td><td>${w.lop || '—'}</td>
+        <td>${(w.final_score || 0).toFixed(1)}%</td><td>${getRiskBadge(w.risk_level)}</td>
+      </tr>
+    `).join('') : '<tr><td colspan="4" style="text-align:center">No high risk students found</td></tr>');
+  }
+
+  async function loadClasses() {
+    const resp = await api.get('/classes/');
+    const d = await resp.json();
+    document.getElementById('classTable').innerHTML = d.results.map(c => `
+      <tr>
+        <td><strong>${c.ten_lop}</strong></td><td>${c.giao_vien_ten || '—'}</td>
+        <td>${c.nam_hoc}</td><td>${c.so_hoc_vien}</td>
+        <td>${c.is_active ? '<span class="badge badge-green">Active</span>' : '<span class="badge">Inactive</span>'}</td>
+        <td><button class="btn btn-outline btn-sm">Edit</button></td>
+      </tr>
+    `).join('');
+  }
+
+  async function loadStudents() {
+    const resp = await api.get('/students/');
+    const d = await resp.json();
+    document.getElementById('studentTable').innerHTML = d.results.map(s => `
+      <tr>
+        <td>#${s.ma_hoc_vien}</td><td><strong>${s.ho_ten}</strong></td>
+        <td>${s.email}</td><td>${s.lop_ten || '—'}</td>
+        <td>${s.gioi_tinh}</td><td><button class="btn btn-outline btn-sm">View</button></td>
+      </tr>
+    `).join('');
+  }
+
+  async function loadScores() {
+    const resp = await api.get('/scores/');
+    const d = await resp.json();
+    document.getElementById('scoreTable').innerHTML = d.results.map(r => `
+      <tr>
+        <td><strong>${r.hoc_vien_ten}</strong></td>
+        <td>${((r.homework_1+r.homework_2+r.homework_3)/3).toFixed(1)}</td>
+        <td>${((r.quiz_1+r.quiz_2)/2).toFixed(1)}</td>
+        <td>${r.midterm_score}</td><td>${r.final_exam}</td>
+        <td><strong>${r.final_score}</strong></td>
+        <td>${r.du_doan ? getRiskBadge(r.du_doan.risk_level) : '—'}</td>
+      </tr>
+    `).join('');
+  }
+
+  async function loadWarnings() { showSection('warnings'); } // Warnings usually auto-load table data
+
+  async function loadMlops() {
+    // Không có API riêng, chỉ hiển thị nút trigger
+    document.getElementById('mlModelStatus').textContent  = 'XGBoost';
+    document.getElementById('mlF1Score').textContent      = 'See MLflow';
+    document.getElementById('mlLastRun').textContent      = 'On-demand';
+  }
+
+  async function triggerRetrain() {
+    const btn    = document.getElementById('retrainBtn');
+    const status = document.getElementById('retrainStatus');
+
+    btn.disabled    = true;
+    btn.textContent = '⏳ Starting pipeline...';
+    status.style.display = 'none';
+
+    try {
+      const resp = await api.post('/admin/retrain/', {});
+      const data = await resp.json();
+
+      if (resp.status === 202) {
+        status.style.display  = 'block';
+        status.innerHTML = `
+          <div style="background:#F0FDF4; border:1px solid #86EFAC; border-radius:8px; padding:16px; color:#16A34A;">
+            <strong>✅ Pipeline đã bắt đầu chạy!</strong><br/>
+            <span style="font-size:13px;">Pipeline đang chạy trong background. Vui lòng đợi 2-5 phút rồi kiểm tra kết quả trên MLflow.</span>
+          </div>`;
+        btn.textContent = '✅ Pipeline Started';
+        setTimeout(() => { btn.disabled = false; btn.textContent = '⚡ Run MLOps Pipeline'; }, 10000);
+      } else {
+        throw new Error(data.error || data.message || 'Unknown error');
+      }
+    } catch(err) {
+      status.style.display = 'block';
+      status.innerHTML = `
+        <div style="background:#FFF5F5; border:1px solid #FED7D7; border-radius:8px; padding:16px; color:#C53030;">
+          <strong>❌ Lỗi:</strong> ${err.message}
+        </div>`;
+      btn.disabled    = false;
+      btn.textContent = '⚡ Run MLOps Pipeline';
+    }
+  }
+
+  // Initialize
+  showSection('dashboard');
+
+  function openClassModal() { document.getElementById('classModal').classList.add('open'); }
+  function closeClassModal() { document.getElementById('classModal').classList.remove('open'); }
+  function openScoreModal() { document.getElementById('scoreModal').classList.add('open'); }
+  function closeScoreModal() { document.getElementById('scoreModal').classList.remove('open'); }
+
+</script>
+</body>
+</html>

@@ -1,0 +1,54 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:16
+    container_name: ews_postgres
+    environment:
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ews_backend
+    volumes:
+      - .:/app
+    environment:
+      - DB_NAME=${DB_NAME}
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_HOST=${DB_HOST}
+      - DB_PORT=${DB_PORT}
+      - MLFLOW_TRACKING_URI=${MLFLOW_TRACKING_URI}
+      - RUNNING_IN_DOCKER=true
+    depends_on:
+      - db
+    entrypoint: ["/bin/bash", "/app/early_waring_backend/entrypoint.sh"]
+
+  frontend:
+    image: nginx:stable-alpine
+    container_name: ews_frontend
+    volumes:
+      - ./frontend:/usr/share/nginx/html
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:v2.19.0
+    container_name: ews_mlflow
+    ports:
+      - "5050:5000"
+    command: mlflow ui --host 0.0.0.0
+
+volumes:
+  postgres_data:

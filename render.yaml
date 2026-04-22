@@ -1,0 +1,48 @@
+services:
+  # ✅ Django Backend (serve cả API + Frontend qua WhiteNoise)
+  - type: web
+    name: ews-backend
+    env: docker
+    dockerContext: .
+    dockerfilePath: Dockerfile
+    plan: free
+    healthCheckPath: /api/health/
+    envVars:
+      - key: SECRET_KEY
+        generateValue: true          # Render tự sinh key ngẫu nhiên, an toàn
+      - key: DEBUG
+        value: "False"
+      - key: DB_NAME
+        fromDatabase:
+          name: ews-db
+          property: database
+      - key: DB_USER
+        fromDatabase:
+          name: ews-db
+          property: user
+      - key: DB_PASSWORD
+        fromDatabase:
+          name: ews-db
+          property: password
+      - key: DB_HOST
+        fromDatabase:
+          name: ews-db
+          property: host
+      - key: DB_PORT
+        fromDatabase:
+          name: ews-db
+          property: port
+      - key: RENDER_EXTERNAL_HOSTNAME
+        fromService:
+          type: web
+          name: ews-backend
+          property: host
+      - key: MLFLOW_TRACKING_URI
+        value: "file:///app/mlruns"   # Lưu MLflow local, không cần server riêng
+
+databases:
+  # ✅ PostgreSQL Managed Database
+  - name: ews-db
+    databaseName: early_warning_db
+    user: ews_user
+    plan: free
