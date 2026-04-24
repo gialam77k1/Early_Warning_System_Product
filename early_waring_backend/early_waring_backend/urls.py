@@ -43,5 +43,5 @@ urlpatterns = [
     re_path(r'^css/(?P<path>.*)$', serve, {'document_root': os.path.join(settings.PROJECT_ROOT, 'frontend', 'css')}),
     re_path(r'^js/(?P<path>.*)$', serve, {'document_root': os.path.join(settings.PROJECT_ROOT, 'frontend', 'js')}),
     re_path(r'^img/(?P<path>.*)$', serve, {'document_root': os.path.join(settings.PROJECT_ROOT, 'frontend', 'img')}),
-    re_path(r'^favicon.ico$', serve, {'document_root': os.path.join(settings.PROJECT_ROOT, 'frontend'), 'path': 'favicon.ico'}),
+    re_path(r'^favicon.ico$', serve, {'document_root': os.path.join(settings.PROJECT_ROOT, 'frontend', 'img'), 'path': 'logo.png'}),
 ]
