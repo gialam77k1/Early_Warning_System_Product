@@ -4,6 +4,7 @@
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Admin Dashboard — EWS Platform</title>
+  <link rel="icon" type="image/png" href="img/logo.png"/>
   <link rel="stylesheet" href="css/style.css"/>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
@@ -13,13 +14,19 @@
   <!-- SIDEBAR -->
   <aside class="sidebar" id="sidebar">
     <div class="sidebar-logo">
-      <h2>EWS Platform</h2>
-      <span>ML Powered Prediction</span>
+      <img src="img/logo.png" alt="EWS Platform logo" class="sidebar-logo-image"/>
+      <div class="sidebar-logo-text">
+        <h2>EWS Platform</h2>
+        <span>ML Powered Prediction</span>
+      </div>
     </div>
     
     <nav class="sidebar-nav">
       <div class="nav-item active" onclick="showSection('dashboard')" id="nav-dashboard">
         <span class="icon">📊</span> Dashboard
+      </div>
+      <div class="nav-item" onclick="showSection('users')" id="nav-users">
+        <span class="icon">👥</span> Users
       </div>
       <div class="nav-item" onclick="showSection('students')" id="nav-students">
         <span class="icon">🎓</span> Students
@@ -36,14 +43,8 @@
       <div class="nav-item" onclick="showSection('warnings')" id="nav-warnings">
         <span class="icon">⚠️</span> Warnings
       </div>
-      <div class="nav-item" onclick="showSection('predictions')" id="nav-predictions">
-        <span class="icon">🤖</span> AI Analytics
-      </div>
       <div class="nav-item" onclick="showSection('mlops')" id="nav-mlops">
         <span class="icon">⚡</span> MLOps
-      </div>
-      <div class="nav-item" onclick="showSection('settings')" id="nav-settings">
-        <span class="icon">⚙️</span> Settings
       </div>
     </nav>
 
@@ -62,17 +63,11 @@
   <!-- MAIN -->
   <main class="main-content">
     <div class="topbar">
-      <div class="topbar-search">
-        <span class="icon">🔍</span>
-        <input type="text" placeholder="Search students, classes, or reports..."/>
-      </div>
+      <div style="font-weight:700; font-size:16px;">EWS Admin</div>
       <div class="topbar-actions">
-        <div class="notif-btn">
-          🔔 <span class="notif-badge">3</span>
-        </div>
-        <div class="top-user">
-          <div class="avatar">A</div>
-          <div class="name">Admin User</div>
+        <div class="top-user" onclick="openProfileModal()">
+          <div class="avatar" id="topAvatar">A</div>
+          <div class="name" id="topUserName">Admin User</div>
         </div>
       </div>
     </div>
@@ -98,7 +93,7 @@
             </div>
           </div>
           <div class="card">
-            <div class="card-title">Risk Distribution by Class</div>
+            <div class="card-title">Risk Distribution</div>
             <div class="chart-container">
               <canvas id="chartRisk"></canvas>
             </div>
@@ -140,10 +135,39 @@
         </div>
       </div>
 
+      <!-- ═══ TEACHERS ═══ -->
+      <div id="sec-teachers" class="section">
+        <div class="card">
+          <div class="modal-header">
+            <h2>Teacher Directory</h2>
+          </div>
+          <div style="display:flex;gap:10px;margin-bottom:16px;">
+            <input id="teacherSearch" type="text" class="form-control" placeholder="🔍 Tìm theo tên giáo viên..." style="max-width:320px" oninput="filterTeachers()"/>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr><th>ID</th><th>Username</th><th>Họ tên</th><th>Email</th><th>SĐT</th><th>Trạng thái</th></tr>
+              </thead>
+              <tbody id="teacherTable"><tr><td colspan="6" style="text-align:center"><div class="spinner"></div></td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
       <!-- ═══ STUDENTS ═══ -->
       <div id="sec-students" class="section">
         <div class="card">
-            <div class="card-title">Student Directory</div>
+          <div class="modal-header">
+            <h2>Student Directory</h2>
+            <button class="btn btn-primary btn-sm" onclick="openAddStudentModal()">+ Add Student</button>
+          </div>
+          <div style="display:flex;gap:10px;margin-bottom:16px;">
+            <input id="studentSearch" type="text" class="form-control" placeholder="🔍 Tìm theo tên..." style="max-width:240px" oninput="filterStudents()"/>
+            <select id="classFilter" class="form-control" style="max-width:200px" onchange="filterStudents()">
+              <option value="">Tất cả lớp</option>
+            </select>
+          </div>
           <div class="table-wrap">
             <table>
               <thead>
@@ -157,19 +181,35 @@
 
       <!-- ═══ GRADEBOOK ═══ -->
       <div id="sec-scores" class="section">
+        <!-- Tab: Pending Approvals -->
+        <div class="card" style="margin-bottom:20px">
+          <div class="modal-header">
+            <h2>⏳ Pending Grade Approvals</h2>
+            <span id="pendingBadge" class="badge badge-orange"></span>
+          </div>
+          <p style="font-size:13px;color:var(--text-secondary);margin-bottom:12px">Điểm do giáo viên gửi lên — Admin duyệt để chính thức hoá.</p>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr><th>Student</th><th>HW Avg</th><th>Quiz</th><th>Midterm</th><th>Final</th><th>Overall</th><th>Actions</th></tr>
+              </thead>
+              <tbody id="pendingTable"><tr><td colspan="7" style="text-align:center">Loading...</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+        <!-- Tab: Approved Scores -->
         <div class="card">
           <div class="modal-header">
-              <h2>Gradebook</h2>
-              <button class="btn btn-primary btn-sm" onclick="openScoreModal()">+ Enter Grade</button>
+              <h2>✅ Approved Scores</h2>
           </div>
           <div class="table-wrap">
             <table>
               <thead>
                 <tr>
-                  <th>Student</th><th>HW Avg</th><th>Quiz Avg</th><th>Midterm</th><th>Final</th><th>Overall</th><th>Risk Level</th>
+                  <th>Student</th><th>HW Avg</th><th>Quiz Avg</th><th>Midterm</th><th>Final</th><th>Overall</th><th>Risk Level</th><th>Actions</th>
                 </tr>
               </thead>
-              <tbody id="scoreTable"><tr><td colspan="7" style="text-align:center"><div class="spinner"></div></td></tr></tbody>
+              <tbody id="scoreTable"><tr><td colspan="8" style="text-align:center"><div class="spinner"></div></td></tr></tbody>
             </table>
           </div>
         </div>
@@ -194,29 +234,23 @@
         </div>
       </div>
 
-      <!-- ═══ PREDICTIONS ═══ -->
-      <div id="sec-predictions" class="section">
-        <div class="grid-2">
-          <div class="card">
-            <div class="card-title">Quick AI Prediction</div>
-            <form id="manualPredictForm">
-              <div class="form-grid-2">
-                <div class="form-group"><label class="form-label">HW1</label><input name="homework_1" type="number" class="form-control" value="7" step="0.1"/></div>
-                <div class="form-group"><label class="form-label">HW2</label><input name="homework_2" type="number" class="form-control" value="7" step="0.1"/></div>
-                <div class="form-group"><label class="form-label">Quiz1</label><input name="quiz_1" type="number" class="form-control" value="7" step="0.1"/></div>
-                <div class="form-group"><label class="form-label">Midterm</label><input name="midterm_score" type="number" class="form-control" value="7" step="0.1"/></div>
-                <div class="form-group"><label class="form-label">Final</label><input name="final_exam" type="number" class="form-control" value="7" step="0.1"/></div>
-                <div class="form-group"><label class="form-label">Attendance</label><input name="attendance_rate" type="number" class="form-control" value="0.9" step="0.01"/></div>
-              </div>
-              <button type="submit" class="btn btn-primary" style="width:100%">Run Prediction</button>
-            </form>
-            <div id="manualResult" style="margin-top:20px"></div>
+      <!-- ═══ USERS MANAGEMENT ═══ -->
+      <div id="sec-users" class="section">
+        <div class="card">
+          <div class="modal-header">
+            <h2>User Management</h2>
           </div>
-          <div class="card">
-            <div class="card-title">Prediction Probabilities</div>
-            <div class="chart-container">
-              <canvas id="chartPredict"></canvas>
-            </div>
+          <p style="font-size:13px; color:var(--text-secondary); margin-bottom:12px;">Quản lý tài khoản, thay đổi vai trò (Admin/Teacher/Student), xóa tài khoản.</p>
+          <div style="display:flex;gap:10px;margin-bottom:16px;">
+            <input id="userSearch" type="text" class="form-control" placeholder="🔍 Tìm theo tên / username / email..." style="max-width:360px" oninput="searchUsers()"/>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr><th>ID</th><th>Username</th><th>Họ tên</th><th>Email</th><th>Vai trò</th><th>Trạng thái</th><th>Actions</th></tr>
+              </thead>
+              <tbody id="userTable"><tr><td colspan="7" style="text-align:center"><div class="spinner"></div></td></tr></tbody>
+            </table>
           </div>
         </div>
       </div>
@@ -322,6 +356,12 @@
         <label class="form-label">Class Name</label>
         <input name="ten_lop" type="text" class="form-control" required/>
       </div>
+      <div class="form-group">
+        <label class="form-label">Teacher</label>
+        <select name="giao_vien" id="classTeacherSelect" class="form-control">
+          <option value="">-- No Teacher --</option>
+        </select>
+      </div>
       <div class="form-grid-2">
         <div class="form-group"><label class="form-label">Year</label><input name="nam_hoc" type="text" class="form-control" value="2025-2026"/></div>
         <div class="form-group"><label class="form-label">Semester</label><select name="hoc_ky" class="form-control"><option value="1">1</option><option value="2">2</option></select></div>
@@ -364,194 +404,792 @@
   </div>
 </div>
 
+<!-- Edit Class Modal -->
+<div class="modal-overlay" id="editClassModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>Edit Class</h2>
+      <span class="modal-close" onclick="closeEditClassModal()">✕</span>
+    </div>
+    <form id="editClassForm">
+      <input type="hidden" id="editClassId"/>
+      <div class="form-group">
+        <label class="form-label">Class Name</label>
+        <input id="editClassName" type="text" class="form-control" required/>
+      </div>
+      <div class="form-grid-2">
+        <div class="form-group">
+          <label class="form-label">Year</label>
+          <input id="editClassYear" type="text" class="form-control" value="2025-2026"/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Semester</label>
+          <select id="editClassSemester" class="form-control">
+            <option value="1">1</option>
+            <option value="2">2</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Teacher</label>
+        <select id="editClassTeacher" class="form-control">
+          <option value="">-- No Teacher --</option>
+        </select>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline" onclick="closeEditClassModal()">Cancel</button>
+        <button type="button" class="btn btn-primary" onclick="saveEditClass()">Save Changes</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Add Student Modal -->
+<div class="modal-overlay" id="studentModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>Add Student</h2>
+      <span class="modal-close" onclick="document.getElementById('studentModal').classList.remove('open')">✕</span>
+    </div>
+    <form id="studentForm">
+      <div class="form-group">
+        <label class="form-label">Select User</label>
+        <select id="studentUserSelect" name="nguoi_dung" class="form-control" required></select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Class</label>
+        <select name="lop" class="form-control"></select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Student ID</label>
+        <input name="ma_hoc_vien" type="text" class="form-control" placeholder="Auto-generated if blank"/>
+      </div>
+      <div class="form-grid-2">
+        <div class="form-group">
+          <label class="form-label">Date of Birth</label>
+          <input name="ngay_sinh" type="date" class="form-control"/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Gender</label>
+          <select name="gioi_tinh" class="form-control">
+            <option value="nam">Nam</option>
+            <option value="nu">Nữ</option>
+          </select>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline" onclick="document.getElementById('studentModal').classList.remove('open')">Cancel</button>
+        <button type="submit" class="btn btn-primary">Add Student</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="modal-overlay" id="editStudentModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>Edit Student</h2>
+      <span class="modal-close" onclick="closeEditStudentModal()">✕</span>
+    </div>
+    <form id="editStudentForm">
+      <input type="hidden" id="editStudentId"/>
+      <div class="form-group">
+        <label class="form-label">Student ID</label>
+        <input id="editStudentCode" name="ma_hoc_vien" type="text" class="form-control" required/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Class</label>
+        <select id="editStudentClass" name="lop" class="form-control">
+          <option value="">-- No Class --</option>
+        </select>
+      </div>
+      <div class="form-grid-2">
+        <div class="form-group">
+          <label class="form-label">Date of Birth</label>
+          <input id="editStudentDob" name="ngay_sinh" type="date" class="form-control"/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Gender</label>
+          <select id="editStudentGender" name="gioi_tinh" class="form-control">
+            <option value="nam">Nam</option>
+            <option value="nu">Nữ</option>
+          </select>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline" onclick="closeEditStudentModal()">Cancel</button>
+        <button type="submit" class="btn btn-primary">Save Student</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="modal-overlay" id="profileModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>My Profile</h2>
+      <span class="modal-close" onclick="closeProfileModal()">✕</span>
+    </div>
+    <form id="profileForm">
+      <div class="form-group">
+        <label class="form-label">Username</label>
+        <input id="profileUsername" type="text" class="form-control" disabled/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Full Name</label>
+        <input id="profileFullName" name="ho_ten" type="text" class="form-control" required/>
+      </div>
+      <div class="form-grid-2">
+        <div class="form-group">
+          <label class="form-label">Email</label>
+          <input id="profileEmail" name="email" type="email" class="form-control"/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Phone Number</label>
+          <input id="profilePhone" name="so_dien_thoai" type="text" class="form-control"/>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Role</label>
+        <input id="profileRole" type="text" class="form-control" disabled/>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline" onclick="closeProfileModal()">Cancel</button>
+        <button type="submit" class="btn btn-primary">Save Profile</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <script src="js/api.js"></script>
 <script>
-  const user = requireAuth(['admin']);
-  if (user) {
-    document.getElementById('sidebarName').textContent = user.ho_ten || user.username;
-    document.getElementById('avatarText').textContent  = (user.ho_ten || user.username)[0].toUpperCase();
+const user = requireAuth(['admin']);
+if (user) {
+  applyProfileToUI(user);
+}
+
+let chartLabel;
+let chartRisk;
+let allUsers = [];
+let allStudents = [];
+let allTeachers = [];
+let allClasses = [];
+
+const sectionConfig = {
+  dashboard: { title: 'Admin Dashboard', desc: 'System-wide academic performance overview', load: loadDashboard },
+  users: { title: 'User Management', desc: 'Manage accounts, roles, and permissions', load: loadUsers },
+  students: { title: 'Students', desc: 'Search by name or filter by class', load: loadStudents },
+  teachers: { title: 'Teachers', desc: 'Teacher directory with search by name', load: loadTeachers },
+  classes: { title: 'Manage Classes', desc: 'Create classes and assign teachers', load: loadClasses },
+  scores: { title: 'Gradebook', desc: 'Teacher-submitted grades waiting for admin approval', load: loadScores },
+  warnings: { title: 'Warnings', desc: 'Official approved warnings from the prediction model', load: loadWarningsData },
+  mlops: { title: 'MLOps Dashboard', desc: 'Check model status and trigger retraining', load: loadMlops },
+};
+
+function escapeHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, (char) => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;',
+  }[char]));
+}
+
+function formatScore(score) {
+  const num = Number(score);
+  return Number.isFinite(num) ? `${num.toFixed(1)}/10` : '—';
+}
+
+function formatDate(value) {
+  if (!value) return '—';
+  const dt = new Date(value);
+  return Number.isNaN(dt.getTime()) ? value : dt.toLocaleString('vi-VN');
+}
+
+function getErrorMessage(data) {
+  if (!data) return 'Có lỗi xảy ra.';
+  if (typeof data === 'string') return data;
+  if (data.error) return data.error;
+  const messages = Object.values(data).flat().filter(Boolean);
+  return messages.join(', ') || 'Có lỗi xảy ra.';
+}
+
+function getSelectedSection() {
+  return document.querySelector('.nav-item.active')?.id?.replace('nav-', '') || 'dashboard';
+}
+
+function applyProfileToUI(currentUser) {
+  const displayName = currentUser.ho_ten || currentUser.username;
+  document.getElementById('sidebarName').textContent = displayName;
+  document.getElementById('topUserName').textContent = displayName;
+  document.getElementById('avatarText').textContent = displayName[0].toUpperCase();
+  document.getElementById('topAvatar').textContent = displayName[0].toUpperCase();
+}
+
+function showSection(name) {
+  document.querySelectorAll('.section').forEach((s) => s.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach((n) => n.classList.remove('active'));
+  document.getElementById(`sec-${name}`)?.classList.add('active');
+  document.getElementById(`nav-${name}`)?.classList.add('active');
+  const cfg = sectionConfig[name];
+  if (cfg) {
+    document.getElementById('pageTitle').textContent = cfg.title;
+    document.getElementById('pageDesc').textContent = cfg.desc;
+    cfg.load();
   }
+}
 
-  let chartLabel, chartRisk, chartPredict;
+async function loadClassOptions(selectors) {
+  const resp = await api.get('/classes/');
+  if (!resp || !resp.ok) return;
+  const data = await resp.json();
+  allClasses = data.results || [];
+  selectors.forEach((selector) => {
+    const el = typeof selector === 'string' ? document.querySelector(selector) : selector;
+    if (!el) return;
+    const emptyOption = el.dataset.emptyOption || '-- No Class --';
+    el.innerHTML = `<option value="">${emptyOption}</option>` + allClasses.map((c) => (
+      `<option value="${c.id}">${escapeHtml(c.ten_lop)}</option>`
+    )).join('');
+  });
+}
 
-  const sectionConfig = {
-    dashboard:   { title: 'Admin Dashboard', desc: 'System-wide academic performance overview', load: loadDashboard },
-    classes:     { title: 'Manage Classes',  desc: 'Create and monitor class groups', load: loadClasses },
-    students:    { title: 'Students',        desc: 'Manage student accounts', load: loadStudents },
-    scores:      { title: 'Gradebook',       desc: 'Raw scores and assessment data', load: loadScores },
-    warnings:    { title: 'Warnings',        desc: 'At-risk students needing intervention', load: loadWarnings },
-    predictions: { title: 'AI Analytics',    desc: 'Deep learning performance prediction', load: loadDashboard },
-    mlops:       { title: 'MLOps Dashboard', desc: 'Manage and trigger ML retraining pipeline', load: loadMlops },
-  };
-
-  function showSection(name) {
-    document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
-    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-    document.getElementById('sec-' + name)?.classList.add('active');
-    document.getElementById('nav-' + name)?.classList.add('active');
-    const cfg = sectionConfig[name];
-    if (cfg) {
-      document.getElementById('pageTitle').textContent = cfg.title;
-      document.getElementById('pageDesc').textContent  = cfg.desc;
-      cfg.load();
-    }
+async function loadTeacherOptions(selectEl) {
+  const resp = await api.get('/admin/teachers/');
+  if (!resp || !resp.ok) return [];
+  const data = await resp.json();
+  allTeachers = data.results || [];
+  if (selectEl) {
+    selectEl.innerHTML = '<option value="">-- No Teacher --</option>' + allTeachers.map((t) => (
+      `<option value="${t.id}">${escapeHtml(t.ho_ten || t.username)}</option>`
+    )).join('');
   }
+  return allTeachers;
+}
 
-  async function loadDashboard() {
-    const resp = await api.get('/dashboard/');
-    if (!resp || !resp.ok) return;
-    const d = await resp.json();
+async function loadDashboard() {
+  const resp = await api.get('/dashboard/');
+  if (!resp || !resp.ok) return;
+  const d = await resp.json();
+  document.getElementById('statsGrid').innerHTML = `
+    <div class="stat-card blue"><div><div class="label">Total Students</div><div class="value">${d.tong_hoc_vien ?? 0}</div></div><div class="stat-icon-wrapper">🎓</div></div>
+    <div class="stat-card purple"><div><div class="label">Total Teachers</div><div class="value">${d.tong_giao_vien ?? 0}</div></div><div class="stat-icon-wrapper">👨‍🏫</div></div>
+    <div class="stat-card pink"><div><div class="label">Total Classes</div><div class="value">${d.tong_lop_hoc ?? 0}</div></div><div class="stat-icon-wrapper">🏫</div></div>
+    <div class="stat-card green"><div><div class="label">Approved Avg</div><div class="value">${Number(d.diem_trung_binh_he_thong || 0).toFixed(1)}%</div></div><div class="stat-icon-wrapper">📈</div></div>
+  `;
 
-    document.getElementById('statsGrid').innerHTML = `
-      <div class="stat-card blue">
-        <div><div class="label">Total Students</div><div class="value">${d.tong_hoc_vien}</div></div>
-        <div class="stat-icon-wrapper">🎓</div>
-      </div>
-      <div class="stat-card purple">
-        <div><div class="label">Total Teachers</div><div class="value">${d.tong_giao_vien}</div></div>
-        <div class="stat-icon-wrapper">👨‍🏫</div>
-      </div>
-      <div class="stat-card pink">
-        <div><div class="label">Total Classes</div><div class="value">${d.tong_lop_hoc}</div></div>
-        <div class="stat-icon-wrapper">🏫</div>
-      </div>
-      <div class="stat-card green">
-        <div><div class="label">Avg Performance</div><div class="value">${d.diem_trung_binh_he_thong || '74.2'}%</div></div>
-        <div class="stat-icon-wrapper">📈</div>
-      </div>
+  const labelData = [d.phan_bo_label?.Excellent || 0, d.phan_bo_label?.Good || 0, d.phan_bo_label?.Average || 0, d.phan_bo_label?.Weak || 0];
+  if (chartLabel) chartLabel.destroy();
+  chartLabel = new Chart(document.getElementById('chartLabel'), {
+    type: 'doughnut',
+    data: {
+      labels: ['Excellent', 'Good', 'Average', 'Weak'],
+      datasets: [{ data: labelData, backgroundColor: ['#22C55E', '#3B82F6', '#F59E0B', '#EF4444'], borderWidth: 0 }],
+    },
+    options: { cutout: '70%', plugins: { legend: { position: 'bottom' } } },
+  });
+
+  const riskData = [d.phan_bo_risk?.no_risk || 0, d.phan_bo_risk?.low_risk || 0, d.phan_bo_risk?.medium_risk || 0, d.phan_bo_risk?.high_risk || 0];
+  if (chartRisk) chartRisk.destroy();
+  chartRisk = new Chart(document.getElementById('chartRisk'), {
+    type: 'bar',
+    data: {
+      labels: ['No Risk', 'Low Risk', 'Medium Risk', 'High Risk'],
+      datasets: [{ data: riskData, backgroundColor: ['#22C55E', '#3B82F6', '#F59E0B', '#EF4444'] }],
+    },
+    options: { plugins: { legend: { display: false } } },
+  });
+
+  const warn = d.hoc_vien_canh_bao || [];
+  document.getElementById('warnTable').innerHTML = warn.length ? warn.map((w) => `
+    <tr>
+      <td><strong>${escapeHtml(w.ho_ten)}</strong></td>
+      <td>${escapeHtml(w.lop || '—')}</td>
+      <td>${formatScore(w.final_score)}</td>
+      <td>${getRiskBadge(w.risk_level)}</td>
+    </tr>
+  `).join('') : '<tr><td colspan="4" style="text-align:center">Chưa có học viên rủi ro cao đã được duyệt.</td></tr>';
+}
+
+async function loadUsers() {
+  const resp = await api.get('/admin/users/');
+  if (!resp || !resp.ok) return;
+  const d = await resp.json();
+  allUsers = d.results || [];
+  renderUsers();
+}
+
+function renderUsers() {
+  const search = (document.getElementById('userSearch')?.value || '').trim().toLowerCase();
+  const me = api.getUser();
+  const filtered = allUsers.filter((u) => {
+    const haystack = `${u.ho_ten || ''} ${u.username || ''} ${u.email || ''}`.toLowerCase();
+    return !search || haystack.includes(search);
+  });
+
+  document.getElementById('userTable').innerHTML = filtered.length ? filtered.map((u) => {
+    const isMe = u.id === me.id;
+    const roleBadge = { admin: 'badge-red', teacher: 'badge-blue', student: 'badge-green' }[u.vai_tro] || 'badge-secondary';
+    return `
+      <tr>
+        <td>#${u.id}</td>
+        <td>${escapeHtml(u.username)}</td>
+        <td><strong>${escapeHtml(u.ho_ten || '—')}</strong></td>
+        <td>${escapeHtml(u.email || '—')}</td>
+        <td>${isMe ? `<span class="badge ${roleBadge}">${escapeHtml(u.vai_tro)}</span>` : `
+          <select class="form-control" style="padding:4px 8px;font-size:12px;width:auto" onchange="changeRole(${u.id}, this.value)">
+            <option value="admin" ${u.vai_tro === 'admin' ? 'selected' : ''}>Admin</option>
+            <option value="teacher" ${u.vai_tro === 'teacher' ? 'selected' : ''}>Teacher</option>
+            <option value="student" ${u.vai_tro === 'student' ? 'selected' : ''}>Student</option>
+          </select>
+        `}</td>
+        <td>${u.is_active ? '<span class="badge badge-green">Active</span>' : '<span class="badge badge-red">Inactive</span>'}</td>
+        <td>${isMe ? '—' : `<button class="btn btn-outline btn-sm" style="color:#EF4444;border-color:#EF4444" onclick="deleteUser(${u.id}, '${escapeHtml(u.username)}')">Delete</button>`}</td>
+      </tr>
     `;
+  }).join('') : '<tr><td colspan="7" style="text-align:center">Không tìm thấy tài khoản.</td></tr>';
+}
 
-    // Charts
-    if (chartLabel) chartLabel.destroy();
-    chartLabel = new Chart(document.getElementById('chartLabel'), {
-       type: 'doughnut',
-       data: {
-         labels: ['Excellent', 'Good', 'Average', 'Weak'],
-         datasets: [{
-           data: [d.phan_bo_label.Excellent||0, d.phan_bo_label.Good||0, d.phan_bo_label.Average||0, d.phan_bo_label.Weak||0],
-           backgroundColor: ['#22C55E', '#3B82F6', '#F59E0B', '#EF4444'],
-           borderWidth: 0
-         }]
-       },
-       options: { cutout: '70%', plugins: { legend: { position: 'bottom' } } }
-    });
+function searchUsers() {
+  renderUsers();
+}
 
-    if (chartRisk) chartRisk.destroy();
-    chartRisk = new Chart(document.getElementById('chartRisk'), {
-      type: 'bar',
-      data: {
-        labels: ['Math 101', 'Physics 201', 'Chemistry 301'],
-        datasets: [
-          { label: 'Good', data: [0.9, 0.2, 0.8], backgroundColor: '#3B82F6' },
-          { label: 'Average', data: [0.7, 0.4, 0.6], backgroundColor: '#F59E0B' },
-          { label: 'At Risk', data: [1.0, 1.0, 1.0], backgroundColor: '#EF4444' }
-        ]
-      },
-      options: { scales: { y: { beginAtZero: true, max: 1 } }, plugins: { legend: { position: 'bottom' } } }
-    });
-
-    // Warning table
-    const warn = d.hoc_vien_canh_bao;
-    document.getElementById('warnTable').innerHTML = (warn.length ? warn.map(w => `
-      <tr>
-        <td><strong>${w.ho_ten}</strong></td><td>${w.lop || '—'}</td>
-        <td>${(w.final_score || 0).toFixed(1)}%</td><td>${getRiskBadge(w.risk_level)}</td>
-      </tr>
-    `).join('') : '<tr><td colspan="4" style="text-align:center">No high risk students found</td></tr>');
+async function changeRole(userId, newRole) {
+  const resp = await api.put(`/admin/users/${userId}/role/`, { vai_tro: newRole });
+  const data = resp ? await resp.json().catch(() => ({})) : null;
+  if (resp && resp.ok) {
+    showToast('Đã cập nhật vai trò.');
+    await Promise.all([loadUsers(), loadStudents(), loadTeachers()]);
+  } else {
+    showToast(getErrorMessage(data), 'error');
+    loadUsers();
   }
+}
 
-  async function loadClasses() {
-    const resp = await api.get('/classes/');
-    const d = await resp.json();
-    document.getElementById('classTable').innerHTML = d.results.map(c => `
-      <tr>
-        <td><strong>${c.ten_lop}</strong></td><td>${c.giao_vien_ten || '—'}</td>
-        <td>${c.nam_hoc}</td><td>${c.so_hoc_vien}</td>
-        <td>${c.is_active ? '<span class="badge badge-green">Active</span>' : '<span class="badge">Inactive</span>'}</td>
-        <td><button class="btn btn-outline btn-sm">Edit</button></td>
-      </tr>
-    `).join('');
+async function deleteUser(userId, username) {
+  if (!confirm(`Xóa tài khoản "${username}"? Hành động này không thể hoàn tác.`)) return;
+  const resp = await api.del(`/admin/users/${userId}/`);
+  if (resp && (resp.ok || resp.status === 204)) {
+    showToast('Đã xóa tài khoản.');
+    await Promise.all([loadUsers(), loadStudents(), loadTeachers()]);
+  } else {
+    const data = resp ? await resp.json().catch(() => ({})) : null;
+    showToast(getErrorMessage(data), 'error');
   }
+}
 
-  async function loadStudents() {
-    const resp = await api.get('/students/');
-    const d = await resp.json();
-    document.getElementById('studentTable').innerHTML = d.results.map(s => `
-      <tr>
-        <td>#${s.ma_hoc_vien}</td><td><strong>${s.ho_ten}</strong></td>
-        <td>${s.email}</td><td>${s.lop_ten || '—'}</td>
-        <td>${s.gioi_tinh}</td><td><button class="btn btn-outline btn-sm">View</button></td>
-      </tr>
-    `).join('');
+async function loadClasses() {
+  const resp = await api.get('/classes/');
+  if (!resp || !resp.ok) return;
+  const d = await resp.json();
+  allClasses = d.results || [];
+  document.getElementById('classTable').innerHTML = allClasses.length ? allClasses.map((c) => `
+    <tr>
+      <td><strong>${escapeHtml(c.ten_lop)}</strong></td>
+      <td>${escapeHtml(c.giao_vien_ten || '—')}</td>
+      <td>${escapeHtml(c.nam_hoc)}</td>
+      <td>${c.so_hoc_vien ?? 0}</td>
+      <td>${c.is_active ? '<span class="badge badge-green">Active</span>' : '<span class="badge badge-orange">Inactive</span>'}</td>
+      <td>
+        <button class="btn btn-outline btn-sm" onclick="editClass(${c.id})" style="margin-right:4px;">Edit</button>
+        <button class="btn btn-outline btn-sm" onclick="deleteClass(${c.id}, '${escapeHtml(c.ten_lop)}')">Delete</button>
+      </td>
+    </tr>
+  `).join('') : '<tr><td colspan="6" style="text-align:center">Chưa có lớp học.</td></tr>';
+}
+
+async function openClassModal() {
+  document.getElementById('classModal').classList.add('open');
+  await loadTeacherOptions(document.getElementById('classTeacherSelect'));
+}
+
+function closeClassModal() {
+  document.getElementById('classModal').classList.remove('open');
+}
+
+function closeEditClassModal() {
+  document.getElementById('editClassModal').classList.remove('open');
+}
+
+async function editClass(classId) {
+  document.getElementById('editClassModal').classList.add('open');
+  document.getElementById('editClassId').value = classId;
+  await loadTeacherOptions(document.getElementById('editClassTeacher'));
+  const resp = await api.get(`/classes/${classId}/`);
+  if (!resp || !resp.ok) return;
+  const c = await resp.json();
+  document.getElementById('editClassName').value = c.ten_lop || '';
+  document.getElementById('editClassYear').value = c.nam_hoc || '';
+  document.getElementById('editClassSemester').value = c.hoc_ky || '1';
+  document.getElementById('editClassTeacher').value = c.giao_vien || '';
+}
+
+async function saveEditClass() {
+  const classId = document.getElementById('editClassId').value;
+  const payload = {
+    ten_lop: document.getElementById('editClassName').value.trim(),
+    nam_hoc: document.getElementById('editClassYear').value.trim(),
+    hoc_ky: Number(document.getElementById('editClassSemester').value),
+    giao_vien: document.getElementById('editClassTeacher').value || null,
+  };
+  const resp = await api.put(`/classes/${classId}/`, payload);
+  const data = resp ? await resp.json().catch(() => ({})) : null;
+  if (resp && resp.ok) {
+    showToast('Đã cập nhật lớp.');
+    closeEditClassModal();
+    await Promise.all([loadClasses(), loadStudents()]);
+  } else {
+    showToast(getErrorMessage(data), 'error');
   }
+}
 
-  async function loadScores() {
-    const resp = await api.get('/scores/');
-    const d = await resp.json();
-    document.getElementById('scoreTable').innerHTML = d.results.map(r => `
-      <tr>
-        <td><strong>${r.hoc_vien_ten}</strong></td>
-        <td>${((r.homework_1+r.homework_2+r.homework_3)/3).toFixed(1)}</td>
-        <td>${((r.quiz_1+r.quiz_2)/2).toFixed(1)}</td>
-        <td>${r.midterm_score}</td><td>${r.final_exam}</td>
-        <td><strong>${r.final_score}</strong></td>
-        <td>${r.du_doan ? getRiskBadge(r.du_doan.risk_level) : '—'}</td>
-      </tr>
-    `).join('');
+async function deleteClass(id, name) {
+  if (!confirm(`Xóa lớp "${name}"?`)) return;
+  const resp = await api.del(`/classes/${id}/`);
+  if (resp && (resp.ok || resp.status === 204)) {
+    showToast('Đã xóa lớp.');
+    await Promise.all([loadClasses(), loadStudents()]);
+  } else {
+    const data = resp ? await resp.json().catch(() => ({})) : null;
+    showToast(getErrorMessage(data), 'error');
   }
+}
 
-  async function loadWarnings() { showSection('warnings'); } // Warnings usually auto-load table data
-
-  async function loadMlops() {
-    // Không có API riêng, chỉ hiển thị nút trigger
-    document.getElementById('mlModelStatus').textContent  = 'XGBoost';
-    document.getElementById('mlF1Score').textContent      = 'See MLflow';
-    document.getElementById('mlLastRun').textContent      = 'On-demand';
+document.getElementById('classForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  const payload = {};
+  fd.forEach((value, key) => {
+    payload[key] = value || null;
+  });
+  payload.hoc_ky = Number(payload.hoc_ky || 1);
+  if (!payload.giao_vien) delete payload.giao_vien;
+  const resp = await api.post('/classes/', payload);
+  const data = resp ? await resp.json().catch(() => ({})) : null;
+  if (resp && resp.ok) {
+    showToast('Đã tạo lớp mới.');
+    e.target.reset();
+    closeClassModal();
+    await Promise.all([loadClasses(), loadStudents()]);
+  } else {
+    showToast(getErrorMessage(data), 'error');
   }
+});
 
-  async function triggerRetrain() {
-    const btn    = document.getElementById('retrainBtn');
-    const status = document.getElementById('retrainStatus');
+async function loadStudents() {
+  document.getElementById('classFilter').dataset.emptyOption = 'Tất cả lớp';
+  const [studentResp] = await Promise.all([
+    api.get('/students/'),
+    loadClassOptions([
+      document.getElementById('classFilter'),
+      document.querySelector('#studentModal select[name="lop"]'),
+      document.getElementById('editStudentClass'),
+    ]),
+  ]);
+  if (!studentResp || !studentResp.ok) return;
+  const data = await studentResp.json();
+  allStudents = data.results || [];
+  filterStudents();
+}
 
-    btn.disabled    = true;
-    btn.textContent = '⏳ Starting pipeline...';
-    status.style.display = 'none';
+function filterStudents() {
+  const search = (document.getElementById('studentSearch')?.value || '').trim().toLowerCase();
+  const classId = document.getElementById('classFilter')?.value || '';
+  const filtered = allStudents.filter((s) => {
+    const haystack = `${s.ho_ten || ''} ${s.ma_hoc_vien || ''}`.toLowerCase();
+    const studentClassId = String(s.lop_id || s.lop || '');
+    return (!search || haystack.includes(search)) && (!classId || studentClassId === classId);
+  });
 
-    try {
-      const resp = await api.post('/admin/retrain/', {});
-      const data = await resp.json();
+  document.getElementById('studentTable').innerHTML = filtered.length ? filtered.map((s) => `
+    <tr>
+      <td>#${escapeHtml(s.ma_hoc_vien)}</td>
+      <td><strong>${escapeHtml(s.ho_ten)}</strong></td>
+      <td>${escapeHtml(s.email || '—')}</td>
+      <td>${escapeHtml(s.lop_ten || '—')}</td>
+      <td>${escapeHtml(s.gioi_tinh || '—')}</td>
+      <td>
+        <button class="btn btn-outline btn-sm" onclick="editStudent(${s.id})" style="margin-right:4px;">Edit</button>
+        <button class="btn btn-outline btn-sm" onclick="deleteStudent(${s.id}, '${escapeHtml(s.ho_ten)}')" style="color:#EF4444;border-color:#EF4444">Delete</button>
+      </td>
+    </tr>
+  `).join('') : '<tr><td colspan="6" style="text-align:center">Không tìm thấy học viên.</td></tr>';
+}
 
-      if (resp.status === 202) {
-        status.style.display  = 'block';
-        status.innerHTML = `
-          <div style="background:#F0FDF4; border:1px solid #86EFAC; border-radius:8px; padding:16px; color:#16A34A;">
-            <strong>✅ Pipeline đã bắt đầu chạy!</strong><br/>
-            <span style="font-size:13px;">Pipeline đang chạy trong background. Vui lòng đợi 2-5 phút rồi kiểm tra kết quả trên MLflow.</span>
-          </div>`;
-        btn.textContent = '✅ Pipeline Started';
-        setTimeout(() => { btn.disabled = false; btn.textContent = '⚡ Run MLOps Pipeline'; }, 10000);
-      } else {
-        throw new Error(data.error || data.message || 'Unknown error');
-      }
-    } catch(err) {
-      status.style.display = 'block';
-      status.innerHTML = `
-        <div style="background:#FFF5F5; border:1px solid #FED7D7; border-radius:8px; padding:16px; color:#C53030;">
-          <strong>❌ Lỗi:</strong> ${err.message}
-        </div>`;
-      btn.disabled    = false;
-      btn.textContent = '⚡ Run MLOps Pipeline';
+async function openAddStudentModal() {
+  document.getElementById('studentModal').classList.add('open');
+  const resp = await api.get('/admin/users/');
+  if (!resp || !resp.ok) return;
+  const data = await resp.json();
+  const usedUserIds = new Set(allStudents.map((s) => s.nguoi_dung));
+  const eligibleUsers = (data.results || []).filter((u) => u.vai_tro === 'student' && !usedUserIds.has(u.id));
+  document.getElementById('studentUserSelect').innerHTML = '<option value="">-- Select User --</option>' + eligibleUsers.map((u) => (
+    `<option value="${u.id}">${escapeHtml(u.ho_ten || u.username)} (${escapeHtml(u.username)})</option>`
+  )).join('');
+  await loadClassOptions([document.querySelector('#studentModal select[name="lop"]')]);
+}
+
+document.getElementById('studentForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  const payload = {};
+  fd.forEach((value, key) => {
+    payload[key] = value || null;
+  });
+  const resp = await api.post('/students/', payload);
+  const data = resp ? await resp.json().catch(() => ({})) : null;
+  if (resp && resp.ok) {
+    showToast('Đã thêm học viên.');
+    document.getElementById('studentModal').classList.remove('open');
+    e.target.reset();
+    await Promise.all([loadStudents(), loadUsers()]);
+  } else {
+    showToast(getErrorMessage(data), 'error');
+  }
+});
+
+async function editStudent(id) {
+  const resp = await api.get(`/students/${id}/`);
+  if (!resp || !resp.ok) return;
+  const s = await resp.json();
+  document.getElementById('editStudentId').value = s.id;
+  document.getElementById('editStudentCode').value = s.ma_hoc_vien || '';
+  document.getElementById('editStudentDob').value = s.ngay_sinh || '';
+  document.getElementById('editStudentGender').value = s.gioi_tinh || 'nam';
+  await loadClassOptions([document.getElementById('editStudentClass')]);
+  document.getElementById('editStudentClass').value = s.lop || '';
+  document.getElementById('editStudentModal').classList.add('open');
+}
+
+function closeEditStudentModal() {
+  document.getElementById('editStudentModal').classList.remove('open');
+}
+
+function openProfileModal() {
+  const currentUser = api.getUser();
+  if (!currentUser) return;
+  document.getElementById('profileUsername').value = currentUser.username || '';
+  document.getElementById('profileFullName').value = currentUser.ho_ten || '';
+  document.getElementById('profileEmail').value = currentUser.email || '';
+  document.getElementById('profilePhone').value = currentUser.so_dien_thoai || '';
+  document.getElementById('profileRole').value = currentUser.vai_tro || '';
+  document.getElementById('profileModal').classList.add('open');
+}
+
+function closeProfileModal() {
+  document.getElementById('profileModal').classList.remove('open');
+}
+
+document.getElementById('profileForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const payload = {
+    ho_ten: document.getElementById('profileFullName').value.trim(),
+    email: document.getElementById('profileEmail').value.trim(),
+    so_dien_thoai: document.getElementById('profilePhone').value.trim(),
+  };
+  const resp = await api.put('/auth/me/', payload);
+  const data = resp ? await resp.json().catch(() => ({})) : null;
+  if (resp && resp.ok) {
+    localStorage.setItem('ews_user', JSON.stringify(data));
+    applyProfileToUI(data);
+    closeProfileModal();
+    showToast('Đã cập nhật thông tin cá nhân.');
+  } else {
+    showToast(getErrorMessage(data), 'error');
+  }
+});
+
+document.getElementById('editStudentForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const payload = {
+    ma_hoc_vien: document.getElementById('editStudentCode').value.trim(),
+    lop: document.getElementById('editStudentClass').value || null,
+    ngay_sinh: document.getElementById('editStudentDob').value || null,
+    gioi_tinh: document.getElementById('editStudentGender').value,
+  };
+  const id = document.getElementById('editStudentId').value;
+  const resp = await api.put(`/students/${id}/`, payload);
+  const data = resp ? await resp.json().catch(() => ({})) : null;
+  if (resp && resp.ok) {
+    showToast('Đã cập nhật học viên.');
+    closeEditStudentModal();
+    loadStudents();
+  } else {
+    showToast(getErrorMessage(data), 'error');
+  }
+});
+
+async function deleteStudent(id, name) {
+  if (!confirm(`Xóa hồ sơ học viên "${name}"?`)) return;
+  const resp = await api.del(`/students/${id}/`);
+  if (resp && (resp.ok || resp.status === 204)) {
+    showToast('Đã xóa hồ sơ học viên.');
+    await Promise.all([loadStudents(), loadUsers()]);
+  } else {
+    const data = resp ? await resp.json().catch(() => ({})) : null;
+    showToast(getErrorMessage(data), 'error');
+  }
+}
+
+async function loadTeachers() {
+  await loadTeacherOptions();
+  filterTeachers();
+}
+
+function filterTeachers() {
+  const search = (document.getElementById('teacherSearch')?.value || '').trim().toLowerCase();
+  const filtered = allTeachers.filter((t) => {
+    const haystack = `${t.ho_ten || ''} ${t.username || ''}`.toLowerCase();
+    return !search || haystack.includes(search);
+  });
+  document.getElementById('teacherTable').innerHTML = filtered.length ? filtered.map((t) => `
+    <tr>
+      <td>${t.id}</td>
+      <td>${escapeHtml(t.username)}</td>
+      <td><strong>${escapeHtml(t.ho_ten || '—')}</strong></td>
+      <td>${escapeHtml(t.email || '—')}</td>
+      <td>${escapeHtml(t.so_dien_thoai || '—')}</td>
+      <td>${t.is_active ? '<span class="badge badge-blue">Active</span>' : '<span class="badge badge-orange">Inactive</span>'}</td>
+    </tr>
+  `).join('') : '<tr><td colspan="6" style="text-align:center">Không tìm thấy giáo viên.</td></tr>';
+}
+
+async function loadScores() {
+  const resp = await api.get('/scores/');
+  if (!resp || !resp.ok) return;
+  const data = await resp.json();
+  const pending = (data.results || []).filter((r) => !r.is_approved);
+  const approved = (data.results || []).filter((r) => r.is_approved);
+  document.getElementById('pendingBadge').textContent = `${pending.length} pending`;
+
+  document.getElementById('pendingTable').innerHTML = pending.length ? pending.map((r) => `
+    <tr>
+      <td><strong>${escapeHtml(r.hoc_vien_ten)}</strong><div style="font-size:12px;color:var(--text-secondary)">${escapeHtml(r.lop_ten || '—')}</div></td>
+      <td>${formatScore((Number(r.homework_1) + Number(r.homework_2) + Number(r.homework_3)) / 3)}</td>
+      <td>${formatScore((Number(r.quiz_1) + Number(r.quiz_2)) / 2)}</td>
+      <td>${formatScore(r.midterm_score)}</td>
+      <td>${formatScore(r.final_exam)}</td>
+      <td><strong>${formatScore(r.final_score)}</strong></td>
+      <td>
+        <button class="btn btn-outline btn-sm" onclick="approveScore(${r.id})" style="color:#16A34A;border-color:#16A34A">Approve</button>
+        <button class="btn btn-outline btn-sm" onclick="rejectScore(${r.id})" style="color:#EF4444;border-color:#EF4444">Reject</button>
+      </td>
+    </tr>
+  `).join('') : '<tr><td colspan="7" style="text-align:center">Không có điểm chờ duyệt.</td></tr>';
+
+  document.getElementById('scoreTable').innerHTML = approved.length ? approved.map((r) => `
+    <tr>
+      <td><strong>${escapeHtml(r.hoc_vien_ten)}</strong><div style="font-size:12px;color:var(--text-secondary)">${escapeHtml(r.lop_ten || '—')}</div></td>
+      <td>${formatScore((Number(r.homework_1) + Number(r.homework_2) + Number(r.homework_3)) / 3)}</td>
+      <td>${formatScore((Number(r.quiz_1) + Number(r.quiz_2)) / 2)}</td>
+      <td>${formatScore(r.midterm_score)}</td>
+      <td>${formatScore(r.final_exam)}</td>
+      <td><strong>${formatScore(r.final_score)}</strong></td>
+      <td>${r.du_doan ? getRiskBadge(r.du_doan.risk_level) : '—'}</td>
+      <td>${r.approved_by_name ? `Approved by ${escapeHtml(r.approved_by_name)}` : 'Official'}</td>
+    </tr>
+  `).join('') : '<tr><td colspan="8" style="text-align:center">Chưa có điểm đã duyệt.</td></tr>';
+}
+
+async function approveScore(scoreId) {
+  const resp = await api.put(`/admin/scores/${scoreId}/approve/`, { action: 'approve' });
+  if (resp && resp.ok) {
+    showToast('Đã duyệt điểm.');
+    await Promise.all([loadScores(), loadDashboard(), loadWarningsData()]);
+  } else {
+    const data = resp ? await resp.json().catch(() => ({})) : null;
+    showToast(getErrorMessage(data), 'error');
+  }
+}
+
+async function rejectScore(scoreId) {
+  if (!confirm('Từ chối và xóa bản nhập điểm này?')) return;
+  const resp = await api.put(`/admin/scores/${scoreId}/approve/`, { action: 'reject' });
+  if (resp && (resp.ok || resp.status === 204)) {
+    showToast('Đã từ chối điểm.');
+    await Promise.all([loadScores(), loadDashboard(), loadWarningsData()]);
+  } else {
+    const data = resp ? await resp.json().catch(() => ({})) : null;
+    showToast(getErrorMessage(data), 'error');
+  }
+}
+
+async function loadWarningsData() {
+  const resp = await api.get('/predictions/warnings/');
+  if (!resp || !resp.ok) return;
+  const data = await resp.json();
+  document.getElementById('warningTable').innerHTML = data.results?.length ? data.results.map((w) => `
+    <tr>
+      <td>#${escapeHtml(w.ma_hoc_vien)}</td>
+      <td><strong>${escapeHtml(w.ho_ten)}</strong></td>
+      <td>${escapeHtml(w.lop || '—')}</td>
+      <td>${formatScore(w.final_score)}</td>
+      <td>${escapeHtml(w.predicted_label)}</td>
+      <td>${getRiskBadge(w.risk_level)}</td>
+    </tr>
+  `).join('') : '<tr><td colspan="6" style="text-align:center">Chưa có cảnh báo chính thức.</td></tr>';
+}
+
+async function loadMlops() {
+  const resp = await api.get('/admin/mlops/status/');
+  if (!resp || !resp.ok) {
+    document.getElementById('mlModelStatus').textContent = 'Unavailable';
+    document.getElementById('mlF1Score').textContent = '—';
+    document.getElementById('mlLastRun').textContent = '—';
+    return;
+  }
+  const data = await resp.json();
+  document.getElementById('mlModelStatus').textContent = data.model_exists ? (data.model_name || 'Unknown') : 'No model';
+  document.getElementById('mlF1Score').textContent = data.last_retrain?.new_f1 ? data.last_retrain.new_f1.toFixed(4) : '—';
+  document.getElementById('mlLastRun').textContent = data.last_retrain?.run_time ? formatDate(data.last_retrain.run_time) : 'Chưa có';
+
+  document.getElementById('lastRetrainResult').innerHTML = data.last_retrain?.run_time ? `
+    <div style="display:grid;gap:10px">
+      <div><strong>Decision:</strong> ${escapeHtml(data.last_retrain.decision || '—')}</div>
+      <div><strong>Winning model:</strong> ${escapeHtml(data.last_retrain.winning_model || data.model_name || '—')}</div>
+      <div><strong>Old F1:</strong> ${data.last_retrain.old_f1 ?? '—'}</div>
+      <div><strong>New F1:</strong> ${data.last_retrain.new_f1 ?? '—'}</div>
+      <div><strong>New samples:</strong> ${data.last_retrain.new_samples ?? 0}</div>
+      <div><strong>Status:</strong> ${escapeHtml(data.last_retrain.reason || '—')}</div>
+    </div>
+  ` : '<div style="text-align:center; color:var(--text-muted); padding:40px 0;">Chưa có kết quả retrain nào được lưu.</div>';
+}
+
+async function triggerRetrain() {
+  const btn = document.getElementById('retrainBtn');
+  const st = document.getElementById('retrainStatus');
+  btn.disabled = true;
+  btn.textContent = '⏳ Starting...';
+  st.style.display = 'none';
+  try {
+    const resp = await api.post('/admin/retrain/', {});
+    const data = resp ? await resp.json().catch(() => ({})) : null;
+    if (resp && resp.status === 202) {
+      st.style.display = 'block';
+      st.innerHTML = `<div style="background:#F0FDF4;border:1px solid #86EFAC;border-radius:8px;padding:16px;color:#16A34A"><strong>✅ ${escapeHtml(data.message || 'Pipeline started.')}</strong></div>`;
+      btn.textContent = '✅ Started';
+      setTimeout(async () => {
+        btn.disabled = false;
+        btn.textContent = '⚡ Run MLOps Pipeline';
+        if (getSelectedSection() === 'mlops') await loadMlops();
+      }, 5000);
+    } else {
+      throw new Error(getErrorMessage(data));
     }
+  } catch (err) {
+    st.style.display = 'block';
+    st.innerHTML = `<div style="background:#FFF5F5;border:1px solid #FED7D7;border-radius:8px;padding:16px;color:#C53030"><strong>❌ Error:</strong> ${escapeHtml(err.message)}</div>`;
+    btn.disabled = false;
+    btn.textContent = '⚡ Run MLOps Pipeline';
   }
+}
 
-  // Initialize
-  showSection('dashboard');
+function closeScoreModal() {
+  document.getElementById('scoreModal')?.classList.remove('open');
+}
 
-  function openClassModal() { document.getElementById('classModal').classList.add('open'); }
-  function closeClassModal() { document.getElementById('classModal').classList.remove('open'); }
-  function openScoreModal() { document.getElementById('scoreModal').classList.add('open'); }
-  function closeScoreModal() { document.getElementById('scoreModal').classList.remove('open'); }
-
+showSection('dashboard');
 </script>
 </body>
 </html>

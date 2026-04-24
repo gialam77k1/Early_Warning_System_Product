@@ -194,6 +194,11 @@ class BangDiem(models.Model):
         verbose_name='Xếp loại'
     )
 
+    is_approved = models.BooleanField(default=False, verbose_name='Đã duyệt')
+    approved_by = models.ForeignKey(
+        NguoiDung, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='approved_scores', verbose_name='Người duyệt'
+    )
     created_at = models.DateTimeField(auto_now_add=True, verbose_name='Ngày tạo')
     updated_at = models.DateTimeField(auto_now=True, verbose_name='Ngày cập nhật')
 

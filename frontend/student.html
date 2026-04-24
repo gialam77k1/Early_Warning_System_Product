@@ -4,6 +4,7 @@
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Student Dashboard — EWS Platform</title>
+  <link rel="icon" type="image/png" href="img/logo.png"/>
   <link rel="stylesheet" href="css/style.css"/>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
@@ -13,8 +14,11 @@
   <!-- SIDEBAR -->
   <aside class="sidebar">
     <div class="sidebar-logo">
-      <h2>EWS Platform</h2>
-      <span>Student Edition</span>
+      <img src="img/logo.png" alt="EWS Platform logo" class="sidebar-logo-image"/>
+      <div class="sidebar-logo-text">
+        <h2>EWS Platform</h2>
+        <span>Student Edition</span>
+      </div>
     </div>
     
     <nav class="sidebar-nav">
@@ -44,15 +48,9 @@
   <!-- MAIN -->
   <main class="main-content">
     <div class="topbar">
-      <div class="topbar-search">
-        <span class="icon">🔍</span>
-        <input type="text" placeholder="Search students, classes, or reports..."/>
-      </div>
+      <div style="font-weight:700; font-size:16px;">Student Portal</div>
       <div class="topbar-actions">
-        <div class="notif-btn">
-          🔔 <span class="notif-badge">2</span>
-        </div>
-        <div class="top-user">
+        <div class="top-user" onclick="openProfileModal()">
           <div class="avatar" id="topAvatar">S</div>
           <div class="name" id="topUserName">Student User</div>
         </div>
@@ -144,22 +142,117 @@
 
       </div>
 
+      <div id="sec-scores" class="section">
+        <div class="card">
+          <div class="card-title">My Score History</div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr><th>Updated At</th><th>HW Avg</th><th>Quiz Avg</th><th>Midterm</th><th>Final</th><th>Overall</th><th>Status</th></tr>
+              </thead>
+              <tbody id="scoreHistoryTable"><tr><td colspan="7" style="text-align:center"><div class="spinner"></div></td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div id="sec-classes" class="section">
+        <div class="card">
+          <div class="card-title">My Class Information</div>
+          <div style="display:grid; gap:16px;">
+            <div style="padding:16px; border:1px solid var(--border); border-radius:10px;">
+              <div style="font-size:12px; color:var(--text-secondary)">Class</div>
+              <div id="classInfoName" style="font-weight:700; font-size:18px;">Loading...</div>
+            </div>
+            <div style="padding:16px; border:1px solid var(--border); border-radius:10px;">
+              <div style="font-size:12px; color:var(--text-secondary)">Latest Approved Grade</div>
+              <div id="classInfoGrade" style="font-weight:700; font-size:18px;">—</div>
+            </div>
+            <div style="padding:16px; border:1px solid var(--border); border-radius:10px;">
+              <div style="font-size:12px; color:var(--text-secondary)">Prediction Status</div>
+              <div id="classInfoRisk" style="font-weight:700; font-size:18px;">—</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
     </div>
   </main>
+</div>
+
+<div class="modal-overlay" id="profileModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>My Profile</h2>
+      <span class="modal-close" onclick="closeProfileModal()">✕</span>
+    </div>
+    <form id="profileForm">
+      <div class="form-group">
+        <label class="form-label">Username</label>
+        <input id="profileUsername" type="text" class="form-control" disabled/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Full Name</label>
+        <input id="profileFullName" name="ho_ten" type="text" class="form-control" required/>
+      </div>
+      <div class="form-grid-2">
+        <div class="form-group">
+          <label class="form-label">Email</label>
+          <input id="profileEmail" name="email" type="email" class="form-control"/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Phone Number</label>
+          <input id="profilePhone" name="so_dien_thoai" type="text" class="form-control"/>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Role</label>
+        <input id="profileRole" type="text" class="form-control" disabled/>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline" onclick="closeProfileModal()">Cancel</button>
+        <button type="submit" class="btn btn-primary">Save Profile</button>
+      </div>
+    </form>
+  </div>
 </div>
 
 <script src="js/api.js"></script>
 <script>
 const user = requireAuth(['student']);
 if (user) {
-  document.getElementById('sidebarName').textContent = user.ho_ten || user.username;
-  document.getElementById('topUserName').textContent = user.ho_ten || user.username;
-  document.getElementById('avatarText').textContent  = (user.ho_ten || user.username)[0].toUpperCase();
-  document.getElementById('topAvatar').textContent    = (user.ho_ten || user.username)[0].toUpperCase();
-  document.getElementById('welcomeText').textContent = `Welcome back, ${user.ho_ten.split(' ')[0]}!`;
+  applyProfileToUI(user);
 }
 
 let radarChart, probChart;
+
+function formatScore(score) {
+  const num = Number(score);
+  return Number.isFinite(num) ? `${num.toFixed(1)}/10` : '—';
+}
+
+function applyProfileToUI(currentUser) {
+  const displayName = currentUser.ho_ten || currentUser.username;
+  document.getElementById('sidebarName').textContent = displayName;
+  document.getElementById('topUserName').textContent = displayName;
+  document.getElementById('avatarText').textContent = displayName[0].toUpperCase();
+  document.getElementById('topAvatar').textContent = displayName[0].toUpperCase();
+  document.getElementById('welcomeText').textContent = `Welcome back, ${displayName.split(' ')[0]}!`;
+}
+
+function renderScoreHistory(scores) {
+  document.getElementById('scoreHistoryTable').innerHTML = scores.length ? scores.map((score) => `
+    <tr>
+      <td>${new Date(score.updated_at).toLocaleString('vi-VN')}</td>
+      <td>${formatScore((score.homework_1 + score.homework_2 + score.homework_3) / 3)}</td>
+      <td>${formatScore((score.quiz_1 + score.quiz_2) / 2)}</td>
+      <td>${formatScore(score.midterm_score)}</td>
+      <td>${formatScore(score.final_exam)}</td>
+      <td><strong>${formatScore(score.final_score)}</strong></td>
+      <td>${score.is_approved ? '<span class="badge badge-green">Approved</span>' : '<span class="badge badge-orange">Pending</span>'}</td>
+    </tr>
+  `).join('') : '<tr><td colspan="7" style="text-align:center">Chưa có điểm được duyệt.</td></tr>';
+}
 
 async function loadData() {
   const meResp = await api.get('/auth/me/');
@@ -171,12 +264,18 @@ async function loadData() {
   if (!myStudent) {
     document.getElementById('mainDashboard').style.display = 'none';
     document.getElementById('noDataState').style.display = 'block';
+    document.getElementById('scoreHistoryTable').innerHTML = '<tr><td colspan="7" style="text-align:center">Bạn chưa có hồ sơ học viên.</td></tr>';
+    document.getElementById('classInfoName').textContent = 'Chưa được xếp lớp';
     return;
   }
 
   const progResp = await api.get(`/students/${myStudent.id}/progress/`);
   const prog = await progResp.json();
   const bd = prog.bang_diem[0];
+  renderScoreHistory(prog.bang_diem || []);
+  document.getElementById('classInfoName').textContent = myStudent.lop_ten || 'Chưa được xếp lớp';
+  document.getElementById('classInfoGrade').textContent = bd ? formatScore(bd.final_score) : '—';
+  document.getElementById('classInfoRisk').innerHTML = prog.du_doan_moi_nhat ? getRiskBadge(prog.du_doan_moi_nhat.risk_level) : 'Chưa có';
 
   if (!bd) {
     document.getElementById('mainDashboard').style.display = 'none';
@@ -185,12 +284,12 @@ async function loadData() {
   }
 
   // Populate stats
-  document.getElementById('valAssig').textContent = `${((bd.homework_1+bd.homework_2+bd.homework_3)/3).toFixed(1)}%`;
-  document.getElementById('valMid').textContent = `${bd.midterm_score}%`;
-  document.getElementById('valFinal').textContent = `${bd.final_exam}%`;
-  document.getElementById('valOverall').textContent = `${bd.final_score}%`;
+  document.getElementById('valAssig').textContent = formatScore((bd.homework_1+bd.homework_2+bd.homework_3)/3);
+  document.getElementById('valMid').textContent = formatScore(bd.midterm_score);
+  document.getElementById('valFinal').textContent = formatScore(bd.final_exam);
+  document.getElementById('valOverall').textContent = formatScore(bd.final_score);
   document.getElementById('enrollClassName').textContent = myStudent.lop_ten || 'Not Enrolled';
-  document.getElementById('enrollScore').textContent = `${bd.final_score}%`;
+  document.getElementById('enrollScore').textContent = formatScore(bd.final_score);
 
   // Radar Chart
   if (radarChart) radarChart.destroy();
@@ -265,6 +364,40 @@ function showSection(name) {
     document.getElementById('sec-' + name)?.classList.add('active');
     document.getElementById('nav-' + name)?.classList.add('active');
 }
+
+function openProfileModal() {
+    const currentUser = api.getUser();
+    if (!currentUser) return;
+    document.getElementById('profileUsername').value = currentUser.username || '';
+    document.getElementById('profileFullName').value = currentUser.ho_ten || '';
+    document.getElementById('profileEmail').value = currentUser.email || '';
+    document.getElementById('profilePhone').value = currentUser.so_dien_thoai || '';
+    document.getElementById('profileRole').value = currentUser.vai_tro || '';
+    document.getElementById('profileModal').classList.add('open');
+}
+
+function closeProfileModal() {
+    document.getElementById('profileModal').classList.remove('open');
+}
+
+document.getElementById('profileForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const payload = {
+        ho_ten: document.getElementById('profileFullName').value.trim(),
+        email: document.getElementById('profileEmail').value.trim(),
+        so_dien_thoai: document.getElementById('profilePhone').value.trim(),
+    };
+    const resp = await api.put('/auth/me/', payload);
+    const data = resp ? await resp.json().catch(() => ({})) : null;
+    if (resp && resp.ok) {
+        localStorage.setItem('ews_user', JSON.stringify(data));
+        applyProfileToUI(data);
+        closeProfileModal();
+        showToast('Đã cập nhật thông tin cá nhân.');
+    } else {
+        showToast(data?.error || 'Không thể cập nhật hồ sơ', 'error');
+    }
+});
 
 loadData();
 </script>

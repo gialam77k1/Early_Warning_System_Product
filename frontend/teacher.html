@@ -4,6 +4,7 @@
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Teacher Dashboard — EWS Platform</title>
+  <link rel="icon" type="image/png" href="img/logo.png"/>
   <link rel="stylesheet" href="css/style.css"/>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
@@ -13,8 +14,11 @@
   <!-- SIDEBAR -->
   <aside class="sidebar">
     <div class="sidebar-logo">
-      <h2>EWS Platform</h2>
-      <span>ML Powered</span>
+      <img src="img/logo.png" alt="EWS Platform logo" class="sidebar-logo-image"/>
+      <div class="sidebar-logo-text">
+        <h2>EWS Platform</h2>
+        <span>ML Powered</span>
+      </div>
     </div>
     
     <nav class="sidebar-nav">
@@ -47,19 +51,13 @@
   <!-- MAIN -->
   <main class="main-content">
     <div class="topbar">
-      <div class="topbar-search">
-        <span class="icon">🔍</span>
-        <input type="text" placeholder="Search students, classes, or reports..."/>
-      </div>
+      <div style="font-weight:700; font-size:16px;">Teacher Panel</div>
       <div class="topbar-actions">
         <select id="lopSelector" class="form-control" style="max-width:200px" onchange="onClassChange()">
           <option value="">Loading classes...</option>
         </select>
-        <div class="notif-btn">
-          🔔 <span class="notif-badge">5</span>
-        </div>
-        <div class="top-user">
-          <div class="avatar">T</div>
+        <div class="top-user" onclick="openProfileModal()">
+          <div class="avatar" id="topAvatar">T</div>
           <div class="name" id="topUserName">Dr. teacher</div>
         </div>
       </div>
@@ -84,17 +82,22 @@
         </div>
 
         <div class="card">
-          <div class="card-title" id="classPerfTitle">Student Performance - Mathematics 101</div>
-          <p style="font-size:12px; color:var(--text-secondary); margin-bottom:16px;">Click on scores to edit and trigger AI prediction</p>
+          <div class="modal-header">
+            <div>
+              <div class="card-title" id="classPerfTitle">Student Performance</div>
+              <p style="font-size:12px; color:var(--text-secondary); margin:6px 0 0;">Giáo viên nhập hoặc sửa điểm tại đây, sau đó admin sẽ duyệt để chính thức áp dụng.</p>
+            </div>
+            <button class="btn btn-primary btn-sm" onclick="openCreateScoreModal()">+ Enter Grade</button>
+          </div>
           <div class="table-wrap">
             <table>
               <thead>
                 <tr>
-                  <th>Student Name</th><th>Assignments</th><th>Midterm</th><th>Final</th><th>Overall</th><th>Risk Level</th>
+                  <th>Student Name</th><th>Class</th><th>Assignments</th><th>Midterm</th><th>Final</th><th>Overall</th><th>Status</th><th>Action</th>
                 </tr>
               </thead>
               <tbody id="studentScoreTable">
-                <tr><td colspan="6" style="text-align:center"><div class="spinner"></div></td></tr>
+                <tr><td colspan="8" style="text-align:center"><div class="spinner"></div></td></tr>
               </tbody>
             </table>
           </div>
@@ -109,6 +112,36 @@
                 <div class="card-title">Risk Analysis</div>
                 <div class="chart-container"><canvas id="chartRisk"></canvas></div>
             </div>
+        </div>
+      </div>
+
+      <div id="sec-students" class="section">
+        <div class="card">
+          <div class="modal-header">
+            <h2>My Students</h2>
+          </div>
+          <div style="display:flex;gap:10px;margin-bottom:16px;">
+            <input id="studentSearch" type="text" class="form-control" placeholder="🔍 Tìm theo tên hoặc mã học viên..." style="max-width:320px" oninput="renderStudentDirectory()"/>
+            <select id="studentClassFilter" class="form-control" style="max-width:220px" onchange="onStudentClassFilterChange()">
+              <option value="">Tất cả lớp</option>
+            </select>
+            <select id="studentRiskFilter" class="form-control" style="max-width:220px" onchange="renderStudentDirectory()">
+              <option value="">Tất cả risk</option>
+              <option value="high_risk">High Risk</option>
+              <option value="medium_risk">Medium Risk</option>
+              <option value="low_risk">Low Risk</option>
+              <option value="no_risk">No Risk</option>
+              <option value="none">Chưa có dự đoán</option>
+            </select>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr><th>Student ID</th><th>Name</th><th>Class</th><th>Current Score</th><th>Risk</th><th>Action</th></tr>
+              </thead>
+              <tbody id="studentDirectoryTable"><tr><td colspan="6" style="text-align:center"><div class="spinner"></div></td></tr></tbody>
+            </table>
+          </div>
         </div>
       </div>
 
@@ -127,6 +160,34 @@
           </div>
       </div>
 
+      <div id="sec-analytics" class="section">
+        <div class="stats-grid" id="analyticsStats"></div>
+        <div class="grid-2">
+          <div class="card">
+            <div class="card-title">Pending Grade Approvals</div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr><th>Student</th><th>Overall</th><th>Updated At</th><th>Status</th></tr>
+                </thead>
+                <tbody id="pendingApprovalTable"><tr><td colspan="4" style="text-align:center"><div class="spinner"></div></td></tr></tbody>
+              </table>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-title">Warnings In Current Class</div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr><th>Student</th><th>Overall</th><th>Prediction</th><th>Risk</th></tr>
+                </thead>
+                <tbody id="warningTable"><tr><td colspan="4" style="text-align:center"><div class="spinner"></div></td></tr></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
     </div>
   </main>
 </div>
@@ -140,7 +201,10 @@
       </div>
       <form id="scoreForm">
         <input type="hidden" id="editScoreId" name="score_id"/>
-        <input type="hidden" id="editHvId" name="hoc_vien"/>
+        <div class="form-group">
+          <label class="form-label">Student</label>
+          <select id="editHvId" name="hoc_vien" class="form-control" required></select>
+        </div>
         <div class="form-grid-3">
           <div class="form-group"><label class="form-label">HW1</label><input name="homework_1" id="f_hw1" type="number" class="form-control" step="0.1"/></div>
           <div class="form-group"><label class="form-label">HW2</label><input name="homework_2" id="f_hw2" type="number" class="form-control" step="0.1"/></div>
@@ -159,18 +223,93 @@
     </div>
 </div>
 
+<div class="modal-overlay" id="profileModal">
+    <div class="modal">
+      <div class="modal-header">
+        <h2>My Profile</h2>
+        <span class="modal-close" onclick="closeProfileModal()">✕</span>
+      </div>
+      <form id="profileForm">
+        <div class="form-group">
+          <label class="form-label">Username</label>
+          <input id="profileUsername" type="text" class="form-control" disabled/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Full Name</label>
+          <input id="profileFullName" name="ho_ten" type="text" class="form-control" required/>
+        </div>
+        <div class="form-grid-2">
+          <div class="form-group">
+            <label class="form-label">Email</label>
+            <input id="profileEmail" name="email" type="email" class="form-control"/>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Phone Number</label>
+            <input id="profilePhone" name="so_dien_thoai" type="text" class="form-control"/>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Role</label>
+          <input id="profileRole" type="text" class="form-control" disabled/>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline" onclick="closeProfileModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save Profile</button>
+        </div>
+      </form>
+    </div>
+</div>
+
 <script src="js/api.js"></script>
 <script>
 const user = requireAuth(['teacher']);
 if (user) {
-  document.getElementById('sidebarName').textContent = user.ho_ten || user.username;
-  document.getElementById('topUserName').textContent = 'Dr. ' + (user.ho_ten || user.username);
-  document.getElementById('avatarText').textContent  = (user.ho_ten || user.username)[0].toUpperCase();
+  applyProfileToUI(user);
 }
 
-let myClasses = [], allScores = [];
+let myClasses = [];
+let allScores = [];
+let currentStudents = [];
+let currentWarnings = [];
 let currentClassId = null;
 let chartLabel, chartRisk;
+
+function renderStudentClassOptions() {
+  const classFilter = document.getElementById('studentClassFilter');
+  if (!classFilter) return;
+  classFilter.innerHTML = '<option value="">Tất cả lớp</option>' + myClasses.map((c) =>
+    `<option value="${c.id}">${escapeHtml(c.ten_lop)}</option>`
+  ).join('');
+  if (currentClassId) classFilter.value = String(currentClassId);
+}
+
+function escapeHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, (char) => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;',
+  }[char]));
+}
+
+function formatScore(score) {
+  const num = Number(score);
+  return Number.isFinite(num) ? `${num.toFixed(1)}/10` : '—';
+}
+
+function getScoreAverage(score) {
+  if (!score) return null;
+  return (Number(score.homework_1) + Number(score.homework_2) + Number(score.homework_3)) / 3;
+}
+
+function applyProfileToUI(currentUser) {
+  const displayName = currentUser.ho_ten || currentUser.username;
+  document.getElementById('sidebarName').textContent = displayName;
+  document.getElementById('topUserName').textContent = displayName;
+  document.getElementById('avatarText').textContent = displayName[0].toUpperCase();
+  document.getElementById('topAvatar').textContent = displayName[0].toUpperCase();
+}
 
 async function initClasses() {
   const resp = await api.get('/classes/');
@@ -184,19 +323,41 @@ async function initClasses() {
   }
   sel.innerHTML = myClasses.map(c => `<option value="${c.id}">${c.ten_lop}</option>`).join('');
   currentClassId = myClasses[0].id;
+  renderStudentClassOptions();
   loadClassDashboard();
 }
 
 function onClassChange() {
   currentClassId = document.getElementById('lopSelector').value;
+  const classFilter = document.getElementById('studentClassFilter');
+  if (classFilter) classFilter.value = currentClassId;
+  loadClassDashboard();
+}
+
+function onStudentClassFilterChange() {
+  const selectedClassId = document.getElementById('studentClassFilter')?.value || '';
+  if (!selectedClassId) {
+    renderStudentDirectory();
+    return;
+  }
+  document.getElementById('lopSelector').value = selectedClassId;
+  currentClassId = selectedClassId;
   loadClassDashboard();
 }
 
 async function loadClassDashboard() {
   if (!currentClassId) return;
-  const resp = await api.get(`/dashboard/class/${currentClassId}/`);
-  if (!resp || !resp.ok) return;
-  const d = await resp.json();
+  const [dashboardResp, studentResp, scoreResp, warningResp] = await Promise.all([
+    api.get(`/dashboard/class/${currentClassId}/`),
+    api.get(`/students/?lop_id=${currentClassId}`),
+    api.get(`/scores/?lop_id=${currentClassId}`),
+    api.get(`/predictions/warnings/?lop_id=${currentClassId}`),
+  ]);
+  if (!dashboardResp || !dashboardResp.ok) return;
+  const d = await dashboardResp.json();
+  currentStudents = studentResp && studentResp.ok ? (await studentResp.json()).results || [] : [];
+  allScores = scoreResp && scoreResp.ok ? (await scoreResp.json()).results || [] : [];
+  currentWarnings = warningResp && warningResp.ok ? (await warningResp.json()).results || [] : [];
 
   document.getElementById('classPerfTitle').textContent = `Student Performance - ${d.ten_lop}`;
   
@@ -206,7 +367,7 @@ async function loadClassDashboard() {
         <div class="stat-icon-wrapper">🎓</div>
     </div>
     <div class="stat-card green">
-        <div><div class="label">Class Average</div><div class="value">${d.diem_trung_binh}%</div></div>
+        <div><div class="label">Class Average</div><div class="value">${formatScore(d.diem_trung_binh)}</div></div>
         <div class="stat-icon-wrapper">📊</div>
     </div>
     <div class="stat-card red">
@@ -222,27 +383,106 @@ async function loadClassDashboard() {
       document.getElementById('atRiskAlert').style.display = 'none';
   }
 
-  // Load scores table
-  loadStudentScores();
+  renderScoreTable();
+  renderStudentDirectory();
+  renderAnalytics(currentWarnings);
   
   // Update charts
   updateCharts(d);
 }
 
-async function loadStudentScores() {
-  const resp = await api.get(`/scores/?lop_id=${currentClassId}`);
-  const d = await resp.json();
-  allScores = d.results;
-  document.getElementById('studentScoreTable').innerHTML = allScores.map(r => `
-    <tr onclick="openScoreModal(${r.id})" style="cursor:pointer">
-      <td><strong>${r.hoc_vien_ten}</strong></td>
-      <td>${((r.homework_1+r.homework_2+r.homework_3)/3).toFixed(1)}%</td>
-      <td>${r.midterm_score.toFixed(1)}%</td>
-      <td>${r.final_exam.toFixed(1)}%</td>
-      <td><strong>${r.final_score.toFixed(1)}%</strong></td>
-      <td>${r.du_doan ? getRiskBadge(r.du_doan.risk_level) : '—'}</td>
+function getLatestScoreMap() {
+  const map = new Map();
+  allScores.forEach((score) => {
+    if (!map.has(score.hoc_vien)) map.set(score.hoc_vien, score);
+  });
+  return map;
+}
+
+function renderScoreTable() {
+  const scoreMap = getLatestScoreMap();
+  const rows = currentStudents.map((student) => {
+    const score = scoreMap.get(student.id);
+    return `
+      <tr>
+        <td><strong>${escapeHtml(student.ho_ten)}</strong><div style="font-size:12px;color:var(--text-secondary)">#${escapeHtml(student.ma_hoc_vien)}</div></td>
+        <td>${escapeHtml(student.lop_ten || '—')}</td>
+        <td>${formatScore(getScoreAverage(score))}</td>
+        <td>${formatScore(score?.midterm_score)}</td>
+        <td>${formatScore(score?.final_exam)}</td>
+        <td><strong>${formatScore(score?.final_score)}</strong></td>
+        <td>${score ? (score.is_approved ? '<span class="badge badge-green">Approved</span>' : '<span class="badge badge-orange">Pending Admin</span>') : '<span class="badge">No grade</span>'}</td>
+        <td><button class="btn btn-outline btn-sm" onclick="${score ? `openScoreModal(${score.id})` : `openCreateScoreModal(${student.id})`}">${score ? 'Edit' : 'Enter Grade'}</button></td>
+      </tr>
+    `;
+  });
+  document.getElementById('studentScoreTable').innerHTML = rows.length ? rows.join('') : '<tr><td colspan="8" style="text-align:center">Chưa có học viên trong lớp này.</td></tr>';
+}
+
+function renderStudentDirectory() {
+  const search = (document.getElementById('studentSearch')?.value || '').trim().toLowerCase();
+  const selectedClassId = document.getElementById('studentClassFilter')?.value || '';
+  const riskFilter = document.getElementById('studentRiskFilter')?.value || '';
+  const scoreMap = getLatestScoreMap();
+  const rows = currentStudents.filter((student) => {
+    const haystack = `${student.ho_ten || ''} ${student.ma_hoc_vien || ''}`.toLowerCase();
+    const score = scoreMap.get(student.id);
+    const riskLevel = score?.du_doan?.risk_level || 'none';
+    const matchSearch = !search || haystack.includes(search);
+    const matchClass = !selectedClassId || String(student.lop_id || student.lop || '') === String(selectedClassId);
+    const matchRisk = !riskFilter || riskLevel === riskFilter;
+    return matchSearch && matchClass && matchRisk;
+  }).map((student) => {
+    const score = scoreMap.get(student.id);
+    return `
+      <tr>
+        <td>${escapeHtml(student.ma_hoc_vien)}</td>
+        <td><strong>${escapeHtml(student.ho_ten)}</strong></td>
+        <td>${escapeHtml(student.lop_ten || '—')}</td>
+        <td>${formatScore(score?.final_score)}</td>
+        <td>${score?.du_doan ? getRiskBadge(score.du_doan.risk_level) : '—'}</td>
+        <td><button class="btn btn-outline btn-sm" onclick="${score ? `openScoreModal(${score.id})` : `openCreateScoreModal(${student.id})`}">${score ? 'Update Grade' : 'Enter Grade'}</button></td>
+      </tr>
+    `;
+  });
+  document.getElementById('studentDirectoryTable').innerHTML = rows.length ? rows.join('') : '<tr><td colspan="6" style="text-align:center">Không có học viên phù hợp với bộ lọc.</td></tr>';
+}
+
+function renderAnalytics(warnings) {
+  const pendingScores = allScores.filter((score) => !score.is_approved);
+  const approvedScores = allScores.filter((score) => score.is_approved);
+  document.getElementById('analyticsStats').innerHTML = `
+    <div class="stat-card blue">
+      <div><div class="label">Pending Approvals</div><div class="value">${pendingScores.length}</div></div>
+      <div class="stat-icon-wrapper">⏳</div>
+    </div>
+    <div class="stat-card green">
+      <div><div class="label">Approved Grades</div><div class="value">${approvedScores.length}</div></div>
+      <div class="stat-icon-wrapper">✅</div>
+    </div>
+    <div class="stat-card red">
+      <div><div class="label">Warnings</div><div class="value">${warnings.length}</div></div>
+      <div class="stat-icon-wrapper">⚠️</div>
+    </div>
+  `;
+
+  document.getElementById('pendingApprovalTable').innerHTML = pendingScores.length ? pendingScores.map((score) => `
+    <tr>
+      <td><strong>${escapeHtml(score.hoc_vien_ten)}</strong></td>
+      <td>${formatScore(score.final_score)}</td>
+      <td>${new Date(score.updated_at).toLocaleString('vi-VN')}</td>
+      <td><span class="badge badge-orange">Waiting admin</span></td>
     </tr>
-  `).join('');
+  `).join('') : '<tr><td colspan="4" style="text-align:center">Không có điểm chờ duyệt.</td></tr>';
+
+  document.getElementById('warningTable').innerHTML = warnings.length ? warnings.map((warning) => `
+    <tr>
+      <td><strong>${escapeHtml(warning.ho_ten)}</strong></td>
+      <td>${formatScore(warning.final_score)}</td>
+      <td>${escapeHtml(warning.predicted_label)}</td>
+      <td>${getRiskBadge(warning.risk_level)}</td>
+    </tr>
+  `).join('') : '<tr><td colspan="4" style="text-align:center">Chưa có cảnh báo chính thức.</td></tr>';
 }
 
 function updateCharts(d) {
@@ -262,9 +502,9 @@ function updateCharts(d) {
     chartRisk = new Chart(document.getElementById('chartRisk'), {
         type: 'bar',
         data: {
-            labels: ['Excellent', 'Good', 'Average', 'At Risk'],
+            labels: ['No Risk', 'Low Risk', 'Medium Risk', 'High Risk'],
             datasets: [{
-                data: [d.phan_bo_label.Excellent||0, d.phan_bo_label.Good||0, d.phan_bo_label.Average||0, d.phan_bo_label.Weak||0],
+                data: [d.phan_bo_risk.no_risk||0, d.phan_bo_risk.low_risk||0, d.phan_bo_risk.medium_risk||0, d.phan_bo_risk.high_risk||0],
                 backgroundColor: ['#A855F7', '#22C55E', '#3B82F6', '#EF4444']
             }]
         },
@@ -286,7 +526,31 @@ function showSection(name) {
                 <td><span class="badge ${c.is_active ? 'badge-green' : 'badge-orange'}">${c.is_active ? 'Active' : 'Archived'}</span></td>
             </tr>
         `).join('');
+    } else if (name === 'students') {
+        renderStudentDirectory();
+    } else if (name === 'analytics') {
+        renderAnalytics(currentWarnings);
     }
+}
+
+function populateStudentSelect(selectedStudentId = '') {
+    const scoreMap = getLatestScoreMap();
+    const options = currentStudents.map((student) => {
+        const score = scoreMap.get(student.id);
+        const suffix = score && score.id !== Number(document.getElementById('editScoreId').value || 0) ? ' (đã có điểm)' : '';
+        return `<option value="${student.id}">${escapeHtml(student.ho_ten)} - ${escapeHtml(student.ma_hoc_vien)}${suffix}</option>`;
+    }).join('');
+    const select = document.getElementById('editHvId');
+    select.innerHTML = `<option value="">-- Select Student --</option>${options}`;
+    if (selectedStudentId) select.value = selectedStudentId;
+}
+
+function openCreateScoreModal(studentId = '') {
+    document.getElementById('modalStudentName').textContent = 'Enter Grades';
+    document.getElementById('scoreForm').reset();
+    document.getElementById('editScoreId').value = '';
+    populateStudentSelect(studentId);
+    document.getElementById('scoreModal').classList.add('open');
 }
 
 function openScoreModal(scoreId) {
@@ -294,7 +558,7 @@ function openScoreModal(scoreId) {
     if (!s) return;
     document.getElementById('modalStudentName').textContent = `Grades - ${s.hoc_vien_ten}`;
     document.getElementById('editScoreId').value = s.id;
-    document.getElementById('editHvId').value = s.hoc_vien;
+    populateStudentSelect(String(s.hoc_vien));
     document.getElementById('f_hw1').value = s.homework_1;
     document.getElementById('f_hw2').value = s.homework_2;
     document.getElementById('f_hw3').value = s.homework_3;
@@ -308,20 +572,58 @@ function openScoreModal(scoreId) {
 
 function closeScoreModal() { document.getElementById('scoreModal').classList.remove('open'); }
 
+function openProfileModal() {
+    const currentUser = api.getUser();
+    if (!currentUser) return;
+    document.getElementById('profileUsername').value = currentUser.username || '';
+    document.getElementById('profileFullName').value = currentUser.ho_ten || '';
+    document.getElementById('profileEmail').value = currentUser.email || '';
+    document.getElementById('profilePhone').value = currentUser.so_dien_thoai || '';
+    document.getElementById('profileRole').value = currentUser.vai_tro || '';
+    document.getElementById('profileModal').classList.add('open');
+}
+
+function closeProfileModal() {
+    document.getElementById('profileModal').classList.remove('open');
+}
+
 document.getElementById('scoreForm').addEventListener('submit', async (e) => {
     e.preventDefault();
     const fd = new FormData(e.target);
     const payload = {};
-    fd.forEach((v, k) => { if (k!=='score_id') payload[k] = parseFloat(v); });
+    fd.forEach((v, k) => {
+        if (k === 'score_id') return;
+        payload[k] = k === 'hoc_vien' ? Number(v) : Number(v);
+    });
     const scoreId = document.getElementById('editScoreId').value;
     
-    const resp = await api.put(`/scores/${scoreId}/`, payload);
-    if (resp.ok) {
-        showToast('Grades updated successfully');
+    const resp = scoreId ? await api.put(`/scores/${scoreId}/`, payload) : await api.post('/scores/', payload);
+    if (resp && resp.ok) {
+        showToast(scoreId ? 'Grades updated and sent for approval' : 'Grades created and sent for approval');
         closeScoreModal();
         loadClassDashboard();
     } else {
-        showToast('Error updating grades', 'error');
+        const data = resp ? await resp.json().catch(() => ({})) : null;
+        showToast(data?.error || 'Error updating grades', 'error');
+    }
+});
+
+document.getElementById('profileForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const payload = {
+        ho_ten: document.getElementById('profileFullName').value.trim(),
+        email: document.getElementById('profileEmail').value.trim(),
+        so_dien_thoai: document.getElementById('profilePhone').value.trim(),
+    };
+    const resp = await api.put('/auth/me/', payload);
+    const data = resp ? await resp.json().catch(() => ({})) : null;
+    if (resp && resp.ok) {
+        localStorage.setItem('ews_user', JSON.stringify(data));
+        applyProfileToUI(data);
+        closeProfileModal();
+        showToast('Đã cập nhật thông tin cá nhân.');
+    } else {
+        showToast(data?.error || 'Không thể cập nhật hồ sơ', 'error');
     }
 });
 

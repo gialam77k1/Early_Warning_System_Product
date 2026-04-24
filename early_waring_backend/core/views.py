@@ -40,6 +40,13 @@ def get_tokens_for_user(user):
     }
 
 
+def generate_student_code():
+    """Sinh mã học viên tăng dần theo định dạng HV0001."""
+    last_hv = HocVien.objects.order_by('-id').first()
+    next_id = (last_hv.id + 1) if last_hv else 1
+    return f'HV{next_id:04d}'
+
+
 # =============================================================
 #  PERMISSION CLASSES
 # =============================================================
@@ -93,7 +100,7 @@ class LoginView(APIView):
 class RegisterView(APIView):
     """
     POST /api/auth/register/
-    Chỉ Admin được tạo tài khoản mới
+    Chỉ Admin được tạo tài khoản mới (chọn role bất kỳ)
     Body: { username, password, email, ho_ten, vai_tro, so_dien_thoai }
     """
     permission_classes = [IsAdmin]
@@ -107,6 +114,31 @@ class RegisterView(APIView):
         return Response({
             'message': f'Tạo tài khoản thành công!',
             'user': NguoiDungSerializer(user).data,
+        }, status=status.HTTP_201_CREATED)
+
+
+class PublicRegisterView(APIView):
+    """
+    POST /api/auth/public-register/
+    Đăng ký tài khoản công khai — luôn tạo role student
+    Body: { username, password, email, ho_ten }
+    """
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        data = request.data.copy()
+        data['vai_tro'] = 'student'  # Luôn tạo student
+        serializer = RegisterSerializer(data=data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        user = serializer.save()
+        tokens = get_tokens_for_user(user)
+        return Response({
+            'message': 'Đăng ký thành công!',
+            'user': NguoiDungSerializer(user).data,
+            'access': tokens['access'],
+            'refresh': tokens['refresh'],
         }, status=status.HTTP_201_CREATED)
 
 
@@ -246,12 +278,14 @@ class LopHocDetailView(APIView):
 class HocVienListView(APIView):
     """
     GET  /api/students/   — Danh sách học viên
+    POST /api/students/   — Tạo học viên mới (Admin)
     """
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
         user = request.user
         lop_id = request.query_params.get('lop_id')
+        search = request.query_params.get('search', '').strip()
 
         if user.vai_tro == 'admin':
             hoc_viens = HocVien.objects.select_related('nguoi_dung', 'lop').all()
@@ -265,6 +299,10 @@ class HocVienListView(APIView):
 
         if lop_id:
             hoc_viens = hoc_viens.filter(lop_id=lop_id)
+        if search:
+            hoc_viens = hoc_viens.filter(
+                Q(nguoi_dung__ho_ten__icontains=search) | Q(ma_hoc_vien__icontains=search)
+            )
 
         serializer = HocVienSerializer(hoc_viens, many=True)
         return Response({
@@ -272,10 +310,50 @@ class HocVienListView(APIView):
             'results': serializer.data,
         })
 
+    def post(self, request):
+        if request.user.vai_tro != 'admin':
+            return Response({'error': 'Chỉ Admin mới được thêm học viên.'}, status=403)
+
+        nguoi_dung_id = request.data.get('nguoi_dung')
+        lop_id = request.data.get('lop')
+        ma_hoc_vien = request.data.get('ma_hoc_vien', '')
+        ngay_sinh = request.data.get('ngay_sinh', None)
+        gioi_tinh = request.data.get('gioi_tinh', 'nam')
+
+        if not nguoi_dung_id:
+            return Response({'error': 'Thiếu nguoi_dung.'}, status=400)
+        try:
+            nd = NguoiDung.objects.get(pk=nguoi_dung_id)
+        except NguoiDung.DoesNotExist:
+            return Response({'error': 'Người dùng không tồn tại.'}, status=404)
+
+        if nd.vai_tro != 'student':
+            return Response({'error': 'Người dùng này không có vai trò student.'}, status=400)
+
+        if HocVien.objects.filter(nguoi_dung=nd).exists():
+            return Response({'error': 'Người dùng này đã có hồ sơ học viên.'}, status=400)
+
+        if lop_id and not LopHoc.objects.filter(pk=lop_id).exists():
+            return Response({'error': 'Lớp học không tồn tại.'}, status=400)
+
+        if not ma_hoc_vien:
+            ma_hoc_vien = generate_student_code()
+
+        hv = HocVien.objects.create(
+            nguoi_dung=nd,
+            ma_hoc_vien=ma_hoc_vien,
+            lop_id=lop_id if lop_id else None,
+            ngay_sinh=ngay_sinh,
+            gioi_tinh=gioi_tinh,
+        )
+        return Response(HocVienSerializer(hv).data, status=201)
+
 
 class HocVienDetailView(APIView):
     """
-    GET /api/students/<id>/   — Chi tiết học viên (+ bảng điểm + dự đoán)
+    GET    /api/students/<id>/   — Chi tiết học viên (+ bảng điểm + dự đoán)
+    PUT    /api/students/<id>/   — Cập nhật học viên (Admin)
+    DELETE /api/students/<id>/   — Xóa hồ sơ học viên (Admin)
     """
     permission_classes = [permissions.IsAuthenticated]
 
@@ -301,6 +379,31 @@ class HocVienDetailView(APIView):
         serializer = HocVienDetailSerializer(hv)
         return Response(serializer.data)
 
+    def put(self, request, pk):
+        if request.user.vai_tro != 'admin':
+            return Response({'error': 'Chỉ Admin mới được cập nhật học viên.'}, status=403)
+
+        hv, err = self.get_object(pk, request.user)
+        if err:
+            return err
+
+        serializer = HocVienSerializer(hv, data=request.data, partial=True)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=400)
+        serializer.save()
+        return Response(serializer.data)
+
+    def delete(self, request, pk):
+        if request.user.vai_tro != 'admin':
+            return Response({'error': 'Chỉ Admin mới được xóa học viên.'}, status=403)
+
+        hv, err = self.get_object(pk, request.user)
+        if err:
+            return err
+
+        hv.delete()
+        return Response({'message': 'Đã xóa hồ sơ học viên.'}, status=204)
+
 
 class HocVienProgressView(APIView):
     """
@@ -309,12 +412,13 @@ class HocVienProgressView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request, pk):
-        try:
-            hv = HocVien.objects.select_related('nguoi_dung', 'lop').get(pk=pk)
-        except HocVien.DoesNotExist:
-            return Response({'error': 'Học viên không tồn tại.'}, status=404)
+        hv, err = HocVienDetailView().get_object(pk, request.user)
+        if err:
+            return err
 
         bang_diems = BangDiem.objects.filter(hoc_vien=hv).prefetch_related('du_doan')
+        if request.user.vai_tro == 'student':
+            bang_diems = bang_diems.filter(is_approved=True)
         bang_diem_data = BangDiemSerializer(bang_diems, many=True).data
 
         # Tổng hợp tiến độ
@@ -390,6 +494,14 @@ class BangDiemListView(APIView):
                 )
 
         bang_diem = serializer.save()
+        if request.user.vai_tro == 'teacher':
+            bang_diem.is_approved = False
+            bang_diem.approved_by = None
+            bang_diem.save(update_fields=['is_approved', 'approved_by', 'updated_at'])
+        else:
+            bang_diem.is_approved = True
+            bang_diem.approved_by = request.user
+            bang_diem.save(update_fields=['is_approved', 'approved_by', 'updated_at'])
 
         # Tự động chạy ML predict sau khi nhập điểm
         _auto_predict(bang_diem)
@@ -427,11 +539,24 @@ class BangDiemDetailView(APIView):
         if not bd:
             return Response({'error': 'Bảng điểm không tồn tại.'}, status=404)
 
+        if request.user.vai_tro == 'teacher':
+            lop_ids = LopHoc.objects.filter(giao_vien=request.user).values_list('id', flat=True)
+            if bd.hoc_vien.lop_id not in lop_ids:
+                return Response({'error': 'Bạn không có quyền sửa điểm của học viên này.'}, status=403)
+
         serializer = BangDiemCreateSerializer(bd, data=request.data, partial=True)
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
         bang_diem = serializer.save()
+        if request.user.vai_tro == 'teacher':
+            bang_diem.is_approved = False
+            bang_diem.approved_by = None
+            bang_diem.save(update_fields=['is_approved', 'approved_by', 'updated_at'])
+        elif request.user.vai_tro == 'admin':
+            bang_diem.is_approved = True
+            bang_diem.approved_by = request.user
+            bang_diem.save(update_fields=['is_approved', 'approved_by', 'updated_at'])
 
         # Tái dự đoán sau khi cập nhật điểm
         _auto_predict(bang_diem)
@@ -669,6 +794,173 @@ class RetrainView(APIView):
         }, status=202)
 
 
+class MlopsStatusView(APIView):
+    """
+    GET /api/admin/mlops/status/   — Trạng thái model + lần retrain gần nhất
+    """
+    permission_classes = [IsAdmin]
+
+    def get(self, request):
+        import json
+
+        model_dir = os.path.abspath(os.path.join(settings.BASE_DIR, '..', 'ml', 'saved_models'))
+        metadata_path = os.path.join(model_dir, 'model_metadata.json')
+        result_path = os.path.join(model_dir, 'last_retrain_result.json')
+
+        metadata = {}
+        last_result = {}
+
+        if os.path.exists(metadata_path):
+            try:
+                with open(metadata_path, 'r', encoding='utf-8') as f:
+                    metadata = json.load(f)
+            except Exception:
+                metadata = {}
+
+        if os.path.exists(result_path):
+            try:
+                with open(result_path, 'r', encoding='utf-8') as f:
+                    last_result = json.load(f)
+            except Exception:
+                last_result = {}
+
+        return Response({
+            'model_name': metadata.get('model_name', 'Unknown'),
+            'model_exists': os.path.exists(os.path.join(model_dir, 'best_model.pkl')),
+            'last_retrain': last_result,
+        })
+
+
+# =============================================================
+#  ADMIN USER MANAGEMENT VIEWS
+# =============================================================
+
+class AdminUserListView(APIView):
+    """
+    GET /api/admin/users/         — Danh sách tất cả users
+    GET /api/admin/users/?search= — Tìm kiếm theo tên / username
+    """
+    permission_classes = [IsAdmin]
+
+    def get(self, request):
+        search = request.query_params.get('search', '').strip()
+        users = NguoiDung.objects.all().order_by('-created_at')
+        if search:
+            users = users.filter(
+                Q(ho_ten__icontains=search) | Q(username__icontains=search) | Q(email__icontains=search)
+            )
+        serializer = NguoiDungSerializer(users, many=True)
+        return Response({
+            'count': users.count(),
+            'results': serializer.data
+        })
+
+
+class AdminUserUpdateRoleView(APIView):
+    """
+    PUT /api/admin/users/<id>/role/   — Thay đổi vai trò user
+    Body: { vai_tro: 'admin' | 'teacher' | 'student' }
+    """
+    permission_classes = [IsAdmin]
+
+    def put(self, request, pk):
+        try:
+            user = NguoiDung.objects.get(pk=pk)
+        except NguoiDung.DoesNotExist:
+            return Response({'error': 'Người dùng không tồn tại.'}, status=404)
+
+        if user == request.user:
+            return Response({'error': 'Không thể thay đổi vai trò của chính mình.'}, status=400)
+
+        new_role = request.data.get('vai_tro')
+        if new_role not in ['admin', 'teacher', 'student']:
+            return Response({'error': 'Vai trò không hợp lệ.'}, status=400)
+
+        old_role = user.vai_tro
+        user.vai_tro = new_role
+        user.save()
+
+        # Nếu chuyển thành student và chưa có HocVien → tạo HocVien
+        if new_role == 'student':
+            if not HocVien.objects.filter(nguoi_dung=user).exists():
+                HocVien.objects.create(
+                    nguoi_dung=user,
+                    ma_hoc_vien=generate_student_code(),
+                )
+
+        return Response({
+            'message': f'Đã đổi vai trò thành {new_role}.',
+            'user': NguoiDungSerializer(user).data,
+        })
+
+
+class AdminUserDeleteView(APIView):
+    """
+    DELETE /api/admin/users/<id>/   — Xóa tài khoản
+    """
+    permission_classes = [IsAdmin]
+
+    def delete(self, request, pk):
+        try:
+            user = NguoiDung.objects.get(pk=pk)
+        except NguoiDung.DoesNotExist:
+            return Response({'error': 'Người dùng không tồn tại.'}, status=404)
+
+        if user == request.user:
+            return Response({'error': 'Không thể xóa chính mình.'}, status=400)
+
+        username = user.username
+        user.delete()
+        return Response({'message': f'Đã xóa tài khoản {username}.'}, status=status.HTTP_204_NO_CONTENT)
+
+# =============================================================
+#  SCORE APPROVAL VIEWS
+# =============================================================
+
+class ApproveScoreView(APIView):
+    """
+    PUT /api/admin/scores/<id>/approve/   — Admin duyệt điểm
+    Body: { action: 'approve' | 'reject' }
+    """
+    permission_classes = [IsAdmin]
+
+    def put(self, request, pk):
+        try:
+            bd = BangDiem.objects.get(pk=pk)
+        except BangDiem.DoesNotExist:
+            return Response({'error': 'Bảng điểm không tồn tại.'}, status=404)
+
+        action = request.data.get('action', 'approve')
+        if action == 'approve':
+            bd.is_approved = True
+            bd.approved_by = request.user
+            bd.save()
+            _auto_predict(bd)
+            return Response({'message': 'Đã duyệt điểm.', 'is_approved': True})
+        elif action == 'reject':
+            bd.delete()
+            return Response({'message': 'Đã từ chối và xóa bảng điểm.'}, status=204)
+        return Response({'error': 'Action không hợp lệ.'}, status=400)
+
+
+class AdminTeacherListView(APIView):
+    """
+    GET /api/admin/teachers/   — Danh sách giáo viên
+    GET /api/admin/teachers/?search=name  — Tìm kiếm theo tên
+    """
+    permission_classes = [IsAdmin]
+
+    def get(self, request):
+        search = request.query_params.get('search', '').strip()
+        teachers = NguoiDung.objects.filter(vai_tro='teacher').order_by('ho_ten')
+        if search:
+            teachers = teachers.filter(
+                Q(ho_ten__icontains=search) | Q(username__icontains=search)
+            )
+        serializer = NguoiDungSerializer(teachers, many=True)
+        return Response({'count': teachers.count(), 'results': serializer.data})
+
+
 # =============================================================
 #  DU DOAN (PREDICTION HISTORY) VIEWS
 # =============================================================
@@ -711,7 +1003,8 @@ class WarningListView(APIView):
         lop_id = request.query_params.get('lop_id')
 
         du_doans = DuDoanML.objects.filter(
-            risk_level__in=['high_risk', 'medium_risk']
+            risk_level__in=['high_risk', 'medium_risk'],
+            bang_diem__is_approved=True,
         ).select_related(
             'bang_diem__hoc_vien__nguoi_dung',
             'bang_diem__hoc_vien__lop'
@@ -755,19 +1048,20 @@ class DashboardView(APIView):
         tong_hv = HocVien.objects.count()
         tong_lop = LopHoc.objects.count()
         tong_gv = NguoiDung.objects.filter(vai_tro='teacher').count()
-        tong_bd = BangDiem.objects.count()
-        tong_dd = DuDoanML.objects.count()
+        approved_scores = BangDiem.objects.filter(is_approved=True)
+        tong_bd = approved_scores.count()
+        tong_dd = DuDoanML.objects.filter(bang_diem__is_approved=True).count()
 
         # Phân bố theo risk_level
-        risk_counts = DuDoanML.objects.values('risk_level').annotate(so_luong=Count('id'))
+        risk_counts = DuDoanML.objects.filter(bang_diem__is_approved=True).values('risk_level').annotate(so_luong=Count('id'))
         phan_bo_risk = {r['risk_level']: r['so_luong'] for r in risk_counts}
 
         # Phân bố theo performance_label
-        label_counts = BangDiem.objects.values('performance_label').annotate(so_luong=Count('id'))
+        label_counts = approved_scores.exclude(performance_label='').exclude(performance_label=None).values('performance_label').annotate(so_luong=Count('id'))
         phan_bo_label = {l['performance_label']: l['so_luong'] for l in label_counts}
 
         # HS cần cảnh báo (high_risk)
-        canh_bao = DuDoanML.objects.filter(risk_level='high_risk').select_related(
+        canh_bao = DuDoanML.objects.filter(risk_level='high_risk', bang_diem__is_approved=True).select_related(
             'bang_diem__hoc_vien__nguoi_dung',
             'bang_diem__hoc_vien__lop'
         )[:10]
@@ -782,12 +1076,22 @@ class DashboardView(APIView):
             for dd in canh_bao
         ]
 
+        # Điểm trung bình toàn hệ thống
+        from django.db.models import Avg
+        avg_score = approved_scores.aggregate(avg=Avg('final_score'))['avg']
+        diem_tb = round(avg_score * 10, 1) if avg_score else 0  # Đổi sang thang 100
+
+        # Điểm pending chờ duyệt
+        pending_count = BangDiem.objects.filter(is_approved=False).count()
+
         return Response({
             'tong_hoc_vien': tong_hv,
             'tong_lop_hoc': tong_lop,
             'tong_giao_vien': tong_gv,
             'tong_bang_diem': tong_bd,
             'tong_du_doan': tong_dd,
+            'diem_trung_binh_he_thong': diem_tb,
+            'pending_approvals': pending_count,
             'phan_bo_risk': phan_bo_risk,
             'phan_bo_label': phan_bo_label,
             'hoc_vien_canh_bao': hv_canh_bao,
@@ -811,8 +1115,8 @@ class DashboardClassView(APIView):
             return Response({'error': 'Không có quyền xem lớp này.'}, status=403)
 
         hoc_viens = HocVien.objects.filter(lop=lop)
-        bang_diems = BangDiem.objects.filter(hoc_vien__lop=lop)
-        du_doans = DuDoanML.objects.filter(bang_diem__hoc_vien__lop=lop)
+        bang_diems = BangDiem.objects.filter(hoc_vien__lop=lop, is_approved=True)
+        du_doans = DuDoanML.objects.filter(bang_diem__hoc_vien__lop=lop, bang_diem__is_approved=True)
 
         # Thống kê điểm
         avg_score = bang_diems.aggregate(avg=Avg('final_score'))['avg'] or 0

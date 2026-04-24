@@ -12,6 +12,7 @@ urlpatterns = [
     path('auth/login/',    views.LoginView.as_view(),   name='auth-login'),
     path('auth/logout/',   views.LogoutView.as_view(),  name='auth-logout'),
     path('auth/register/', views.RegisterView.as_view(), name='auth-register'),
+    path('auth/public-register/', views.PublicRegisterView.as_view(), name='auth-public-register'),
     path('auth/me/',       views.MeView.as_view(),      name='auth-me'),
     path('auth/token/refresh/', TokenRefreshView.as_view(), name='token-refresh'),
 
@@ -41,6 +42,12 @@ urlpatterns = [
     path('dashboard/',              views.DashboardView.as_view(),      name='dashboard'),
     path('dashboard/class/<int:pk>/', views.DashboardClassView.as_view(), name='dashboard-class'),
 
-    # ── MLOPS ADMIN ───────────────────────────────────────────
-    path('admin/retrain/', views.RetrainView.as_view(), name='admin-retrain'),
+    # ── ADMIN ─────────────────────────────────────────────────
+    path('admin/retrain/',              views.RetrainView.as_view(),            name='admin-retrain'),
+    path('admin/mlops/status/',         views.MlopsStatusView.as_view(),        name='admin-mlops-status'),
+    path('admin/users/',                views.AdminUserListView.as_view(),      name='admin-users'),
+    path('admin/users/<int:pk>/role/',  views.AdminUserUpdateRoleView.as_view(), name='admin-user-role'),
+    path('admin/users/<int:pk>/',       views.AdminUserDeleteView.as_view(),    name='admin-user-delete'),
+    path('admin/teachers/',             views.AdminTeacherListView.as_view(),   name='admin-teachers'),
+    path('admin/scores/<int:pk>/approve/', views.ApproveScoreView.as_view(),    name='admin-approve-score'),
 ]

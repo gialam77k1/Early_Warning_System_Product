@@ -107,12 +107,13 @@ class HocVienSerializer(serializers.ModelSerializer):
     ho_ten = serializers.CharField(source='nguoi_dung.ho_ten', read_only=True)
     email = serializers.CharField(source='nguoi_dung.email', read_only=True)
     lop_ten = serializers.CharField(source='lop.ten_lop', read_only=True, default='')
+    lop_id = serializers.IntegerField(source='lop.id', read_only=True, allow_null=True)
 
     class Meta:
         model = HocVien
         fields = [
             'id', 'nguoi_dung', 'ma_hoc_vien', 'ho_ten', 'email',
-            'lop', 'lop_ten', 'ngay_sinh', 'gioi_tinh', 'created_at'
+            'lop', 'lop_id', 'lop_ten', 'ngay_sinh', 'gioi_tinh', 'created_at'
         ]
         read_only_fields = ['id', 'created_at']
 
@@ -160,16 +161,20 @@ class BangDiemSerializer(serializers.ModelSerializer):
     """Serializer bảng điểm"""
     hoc_vien_ma = serializers.CharField(source='hoc_vien.ma_hoc_vien', read_only=True)
     hoc_vien_ten = serializers.CharField(source='hoc_vien.nguoi_dung.ho_ten', read_only=True)
+    lop_ten = serializers.CharField(source='hoc_vien.lop.ten_lop', read_only=True, default='')
     du_doan = DuDoanMLSerializer(read_only=True)
+    approved_by_name = serializers.CharField(source='approved_by.ho_ten', read_only=True, default='')
 
     class Meta:
         model = BangDiem
         fields = [
             'id', 'hoc_vien', 'hoc_vien_ma', 'hoc_vien_ten',
+            'lop_ten',
             'homework_1', 'homework_2', 'homework_3',
             'quiz_1', 'quiz_2',
             'midterm_score', 'final_exam', 'attendance_rate',
             'final_score', 'performance_label',
+            'is_approved', 'approved_by', 'approved_by_name',
             'du_doan',
             'created_at', 'updated_at'
         ]
