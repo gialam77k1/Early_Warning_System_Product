@@ -7,6 +7,10 @@
 
 import sys
 import os
+import io
+import json
+import threading
+from datetime import datetime
 from django.conf import settings
 from django.db.models import Count, Avg, Q
 from django.contrib.auth import login, logout
@@ -25,6 +29,9 @@ from .serializers import (
     DuDoanMLSerializer,
     PredictInputSerializer, PredictBatchSerializer, PredictManualSerializer,
 )
+
+
+RETRAIN_STATUS_FILENAME = 'retrain_status.json'
 
 
 # =============================================================
@@ -603,6 +610,42 @@ def _get_model_name():
         return 'Unknown'
 
 
+def _get_model_dir():
+    return os.path.abspath(os.path.join(settings.BASE_DIR, '..', 'ml', 'saved_models'))
+
+
+def _get_retrain_status_path():
+    return os.path.join(_get_model_dir(), RETRAIN_STATUS_FILENAME)
+
+
+def _read_json_file(path, default=None):
+    if default is None:
+        default = {}
+    if not os.path.exists(path):
+        return default
+    try:
+        with open(path, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except Exception:
+        return default
+
+
+def _write_json_file(path, payload):
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, 'w', encoding='utf-8') as f:
+        json.dump(payload, f, indent=2, ensure_ascii=False)
+
+
+def _set_retrain_status(state, **extra):
+    payload = {
+        'state': state,
+        'updated_at': datetime.now().isoformat(),
+        **extra,
+    }
+    _write_json_file(_get_retrain_status_path(), payload)
+    return payload
+
+
 def _auto_predict(bang_diem: BangDiem):
     """
     Tự động chạy ML predict và lưu kết quả vào DuDoanML.
@@ -772,25 +815,63 @@ class RetrainView(APIView):
     permission_classes = [IsAdmin]
 
     def post(self, request):
-        import threading
         from django.core.management import call_command
-        import io
 
-        # Lưu log vào biến tạm để trả lại kết quả
-        log_output = io.StringIO()
+        current_status = _read_json_file(_get_retrain_status_path(), default={})
+        if current_status.get('state') == 'running':
+            return Response({
+                'status': 'running',
+                'message': 'MLOps pipeline đang chạy. Vui lòng đợi tiến trình hiện tại hoàn tất.',
+                'retrain_status': current_status,
+            }, status=409)
+
+        started_at = datetime.now().isoformat()
+        _set_retrain_status(
+            'queued',
+            requested_by=request.user.username,
+            started_at=started_at,
+            message='Yêu cầu retrain đã được đưa vào hàng chờ nội bộ.',
+        )
 
         def run_retrain():
+            log_output = io.StringIO()
             try:
+                _set_retrain_status(
+                    'running',
+                    requested_by=request.user.username,
+                    started_at=started_at,
+                    message='Pipeline đang huấn luyện lại model trên server.',
+                )
                 call_command('ml_retrain', stdout=log_output, stderr=log_output)
+                _set_retrain_status(
+                    'completed',
+                    requested_by=request.user.username,
+                    started_at=started_at,
+                    finished_at=datetime.now().isoformat(),
+                    message='Retrain hoàn tất.',
+                    last_output=log_output.getvalue()[-4000:],
+                )
             except Exception as e:
-                log_output.write(f'\n[ERROR] {str(e)}')
+                error_output = log_output.getvalue()
+                if error_output:
+                    error_output += '\n'
+                error_output += f'[ERROR] {str(e)}'
+                _set_retrain_status(
+                    'failed',
+                    requested_by=request.user.username,
+                    started_at=started_at,
+                    finished_at=datetime.now().isoformat(),
+                    message='Retrain thất bại.',
+                    last_output=error_output[-4000:],
+                )
 
         thread = threading.Thread(target=run_retrain, daemon=True)
         thread.start()
 
         return Response({
             'status': 'started',
-            'message': 'MLOps pipeline đã được khởi chạy trong background. Kiểm tra MLflow sau vài phút.'
+            'message': 'MLOps pipeline đã được khởi chạy trong background trên backend hiện tại.',
+            'retrain_status': _read_json_file(_get_retrain_status_path(), default={}),
         }, status=202)
 
 
@@ -801,33 +882,20 @@ class MlopsStatusView(APIView):
     permission_classes = [IsAdmin]
 
     def get(self, request):
-        import json
-
-        model_dir = os.path.abspath(os.path.join(settings.BASE_DIR, '..', 'ml', 'saved_models'))
+        model_dir = _get_model_dir()
         metadata_path = os.path.join(model_dir, 'model_metadata.json')
         result_path = os.path.join(model_dir, 'last_retrain_result.json')
+        status_path = _get_retrain_status_path()
 
-        metadata = {}
-        last_result = {}
-
-        if os.path.exists(metadata_path):
-            try:
-                with open(metadata_path, 'r', encoding='utf-8') as f:
-                    metadata = json.load(f)
-            except Exception:
-                metadata = {}
-
-        if os.path.exists(result_path):
-            try:
-                with open(result_path, 'r', encoding='utf-8') as f:
-                    last_result = json.load(f)
-            except Exception:
-                last_result = {}
+        metadata = _read_json_file(metadata_path, default={})
+        last_result = _read_json_file(result_path, default={})
+        retrain_status = _read_json_file(status_path, default={'state': 'idle'})
 
         return Response({
             'model_name': metadata.get('model_name', 'Unknown'),
             'model_exists': os.path.exists(os.path.join(model_dir, 'best_model.pkl')),
             'last_retrain': last_result,
+            'retrain_status': retrain_status,
         })
 
 

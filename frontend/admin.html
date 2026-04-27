@@ -1144,6 +1144,25 @@ async function loadMlops() {
   document.getElementById('mlModelStatus').textContent = data.model_exists ? (data.model_name || 'Unknown') : 'No model';
   document.getElementById('mlF1Score').textContent = data.last_retrain?.new_f1 ? data.last_retrain.new_f1.toFixed(4) : '—';
   document.getElementById('mlLastRun').textContent = data.last_retrain?.run_time ? formatDate(data.last_retrain.run_time) : 'Chưa có';
+  const retrainState = data.retrain_status?.state || 'idle';
+  const retrainBtn = document.getElementById('retrainBtn');
+  const retrainStatusBox = document.getElementById('retrainStatus');
+  retrainBtn.disabled = retrainState === 'running' || retrainState === 'queued';
+  retrainBtn.textContent = retrainState === 'running' || retrainState === 'queued'
+    ? '⏳ Retraining...'
+    : '⚡ Run MLOps Pipeline';
+
+  if (retrainState !== 'idle') {
+    const palette = retrainState === 'failed'
+      ? { bg: '#FFF5F5', border: '#FED7D7', text: '#C53030', icon: '❌' }
+      : retrainState === 'completed'
+      ? { bg: '#F0FDF4', border: '#86EFAC', text: '#16A34A', icon: '✅' }
+      : { bg: '#EFF6FF', border: '#BFDBFE', text: '#1D4ED8', icon: '⏳' };
+    retrainStatusBox.style.display = 'block';
+    retrainStatusBox.innerHTML = `<div style="background:${palette.bg};border:1px solid ${palette.border};border-radius:8px;padding:16px;color:${palette.text}"><strong>${palette.icon} ${escapeHtml(data.retrain_status?.message || retrainState)}</strong>${data.retrain_status?.updated_at ? `<div style="margin-top:8px;font-size:12px;opacity:.85">Updated: ${escapeHtml(formatDate(data.retrain_status.updated_at))}</div>` : ''}</div>`;
+  } else {
+    retrainStatusBox.style.display = 'none';
+  }
 
   document.getElementById('lastRetrainResult').innerHTML = data.last_retrain?.run_time ? `
     <div style="display:grid;gap:10px">
@@ -1166,15 +1185,22 @@ async function triggerRetrain() {
   try {
     const resp = await api.post('/admin/retrain/', {});
     const data = resp ? await resp.json().catch(() => ({})) : null;
-    if (resp && resp.status === 202) {
+    if (resp && (resp.status === 202 || resp.status === 409)) {
+      const isRunning = resp.status === 409;
       st.style.display = 'block';
-      st.innerHTML = `<div style="background:#F0FDF4;border:1px solid #86EFAC;border-radius:8px;padding:16px;color:#16A34A"><strong>✅ ${escapeHtml(data.message || 'Pipeline started.')}</strong></div>`;
-      btn.textContent = '✅ Started';
-      setTimeout(async () => {
-        btn.disabled = false;
-        btn.textContent = '⚡ Run MLOps Pipeline';
-        if (getSelectedSection() === 'mlops') await loadMlops();
-      }, 5000);
+      st.innerHTML = `<div style="background:${isRunning ? '#EFF6FF' : '#F0FDF4'};border:1px solid ${isRunning ? '#BFDBFE' : '#86EFAC'};border-radius:8px;padding:16px;color:${isRunning ? '#1D4ED8' : '#16A34A'}"><strong>${isRunning ? '⏳' : '✅'} ${escapeHtml(data.message || 'Pipeline started.')}</strong></div>`;
+      btn.textContent = isRunning ? '⏳ Retraining...' : '✅ Started';
+      const refreshStatus = async () => {
+        if (getSelectedSection() === 'mlops') {
+          await loadMlops();
+          const latest = await api.get('/admin/mlops/status/');
+          const latestData = latest && latest.ok ? await latest.json().catch(() => null) : null;
+          if (latestData?.retrain_status?.state === 'running' || latestData?.retrain_status?.state === 'queued') {
+            setTimeout(refreshStatus, 5000);
+          }
+        }
+      };
+      setTimeout(refreshStatus, 5000);
     } else {
       throw new Error(getErrorMessage(data));
     }
