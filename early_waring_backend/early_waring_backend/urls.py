@@ -32,7 +32,8 @@ urlpatterns = [
     path('api/', include('core.urls')),
     
     # ── FRONTEND HTML ──
-    path('', TemplateView.as_view(template_name='index.html'), name='home'),
+    path('', TemplateView.as_view(template_name='home.html'), name='home'),
+    path('home.html', TemplateView.as_view(template_name='home.html')),
     path('index.html', TemplateView.as_view(template_name='index.html')),
     path('register.html', TemplateView.as_view(template_name='register.html')),
     path('admin.html', TemplateView.as_view(template_name='admin.html')),
