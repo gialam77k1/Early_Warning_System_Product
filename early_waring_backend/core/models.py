@@ -221,6 +221,18 @@ class BangDiem(models.Model):
         )
         return self.final_score
 
+    def calculate_performance_label(self):
+        """Suy ra xếp loại từ điểm tổng kết theo thang 10."""
+        if self.final_score < 5.0:
+            self.performance_label = self.PerformanceLabel.WEAK
+        elif self.final_score < 6.5:
+            self.performance_label = self.PerformanceLabel.AVERAGE
+        elif self.final_score < 8.0:
+            self.performance_label = self.PerformanceLabel.GOOD
+        else:
+            self.performance_label = self.PerformanceLabel.EXCELLENT
+        return self.performance_label
+
     def get_features(self):
         """Trả về 7 features để đưa vào model ML.
         Lưu ý: final_exam không được bao gồm vì nó chỉ có sau khi thi.
@@ -238,8 +250,9 @@ class BangDiem(models.Model):
         }
 
     def save(self, *args, **kwargs):
-        """Auto tính final_score khi save"""
+        """Auto tính final_score và performance_label khi save"""
         self.calculate_final_score()
+        self.calculate_performance_label()
         super().save(*args, **kwargs)
 
 

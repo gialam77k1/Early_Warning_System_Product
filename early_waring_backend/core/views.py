@@ -610,6 +610,14 @@ def _get_model_name():
         return 'Unknown'
 
 
+def _get_model_metadata():
+    metadata_path = os.path.join(
+        os.path.abspath(os.path.join(settings.BASE_DIR, '..', 'ml')),
+        'saved_models', 'model_metadata.json'
+    )
+    return _read_json_file(metadata_path, default={})
+
+
 def _get_model_dir():
     return os.path.abspath(os.path.join(settings.BASE_DIR, '..', 'ml', 'saved_models'))
 
@@ -644,6 +652,36 @@ def _set_retrain_status(state, **extra):
     }
     _write_json_file(_get_retrain_status_path(), payload)
     return payload
+
+
+def _infer_performance_label_from_score(score):
+    if score is None:
+        return None
+    try:
+        numeric_score = float(score)
+    except (TypeError, ValueError):
+        return None
+    if numeric_score < 5.0:
+        return BangDiem.PerformanceLabel.WEAK
+    if numeric_score < 6.5:
+        return BangDiem.PerformanceLabel.AVERAGE
+    if numeric_score < 8.0:
+        return BangDiem.PerformanceLabel.GOOD
+    return BangDiem.PerformanceLabel.EXCELLENT
+
+
+def _build_label_distribution(score_queryset):
+    distribution = {
+        BangDiem.PerformanceLabel.EXCELLENT: 0,
+        BangDiem.PerformanceLabel.GOOD: 0,
+        BangDiem.PerformanceLabel.AVERAGE: 0,
+        BangDiem.PerformanceLabel.WEAK: 0,
+    }
+    for score in score_queryset:
+        label = score.performance_label or _infer_performance_label_from_score(score.final_score)
+        if label in distribution:
+            distribution[label] += 1
+    return {label: count for label, count in distribution.items() if count}
 
 
 def _auto_predict(bang_diem: BangDiem):
@@ -883,17 +921,35 @@ class MlopsStatusView(APIView):
 
     def get(self, request):
         model_dir = _get_model_dir()
-        metadata_path = os.path.join(model_dir, 'model_metadata.json')
         result_path = os.path.join(model_dir, 'last_retrain_result.json')
         status_path = _get_retrain_status_path()
 
-        metadata = _read_json_file(metadata_path, default={})
+        metadata = _get_model_metadata()
         last_result = _read_json_file(result_path, default={})
         retrain_status = _read_json_file(status_path, default={'state': 'idle'})
+        current_metrics = metadata.get('metrics', {})
+        fallback_run_time = metadata.get('created_at') or metadata.get('updated_at')
+        if fallback_run_time and 'run_time' not in last_result:
+            last_result['run_time'] = fallback_run_time
+        if current_metrics and 'new_f1' not in last_result:
+            last_result['new_f1'] = current_metrics.get('f1_macro')
+        if current_metrics and 'accuracy' not in last_result:
+            last_result['accuracy'] = current_metrics.get('accuracy')
+        if current_metrics and 'recall_macro' not in last_result:
+            last_result['recall_macro'] = current_metrics.get('recall_macro')
+        if metadata.get('model_name') and 'winning_model' not in last_result:
+            last_result['winning_model'] = metadata.get('model_name')
+        if 'reason' not in last_result and os.path.exists(os.path.join(model_dir, 'best_model.pkl')):
+            last_result['reason'] = 'Current production model loaded from metadata.'
 
         return Response({
             'model_name': metadata.get('model_name', 'Unknown'),
             'model_exists': os.path.exists(os.path.join(model_dir, 'best_model.pkl')),
+            'current_model': {
+                'metrics': current_metrics,
+                'created_at': metadata.get('created_at'),
+                'updated_at': metadata.get('updated_at'),
+            },
             'last_retrain': last_result,
             'retrain_status': retrain_status,
         })
@@ -1125,8 +1181,7 @@ class DashboardView(APIView):
         phan_bo_risk = {r['risk_level']: r['so_luong'] for r in risk_counts}
 
         # Phân bố theo performance_label
-        label_counts = approved_scores.exclude(performance_label='').exclude(performance_label=None).values('performance_label').annotate(so_luong=Count('id'))
-        phan_bo_label = {l['performance_label']: l['so_luong'] for l in label_counts}
+        phan_bo_label = _build_label_distribution(approved_scores)
 
         # HS cần cảnh báo (high_risk)
         canh_bao = DuDoanML.objects.filter(risk_level='high_risk', bang_diem__is_approved=True).select_related(
@@ -1190,8 +1245,7 @@ class DashboardClassView(APIView):
         avg_score = bang_diems.aggregate(avg=Avg('final_score'))['avg'] or 0
 
         # Phân bố label
-        label_counts = bang_diems.values('performance_label').annotate(so_luong=Count('id'))
-        phan_bo_label = {l['performance_label']: l['so_luong'] for l in label_counts}
+        phan_bo_label = _build_label_distribution(bang_diems)
 
         # Phân bố risk
         risk_counts = du_doans.values('risk_level').annotate(so_luong=Count('id'))

@@ -255,3 +255,51 @@ Xóa bỏ hoàn toàn `div.notif-btn` khỏi cả 3 trang (admin, teacher, stude
 - Admin, Teacher, Student giờ đều có modal `My Profile` khi bấm vào khu vực user ở topbar.
 - Có thể tự cập nhật `họ tên`, `email`, `số điện thoại` thông qua `PUT /api/auth/me/`.
 - Sau khi lưu, tên/avatar trên giao diện được refresh ngay mà không cần đăng nhập lại.
+
+### ✅ Added: Backend regression test suite for key user flows
+- **File:** `early_waring_backend/core/tests.py`
+- Thêm 10 test case cho các luồng quan trọng:
+  - serve frontend pages + static assets
+  - public register
+  - login + JWT `me`
+  - tự cập nhật profile
+  - admin tạo lớp + hồ sơ học viên
+  - admin list users/teachers
+  - teacher chỉ thấy học viên lớp mình
+  - teacher nhập điểm pending approval
+  - teacher không được nhập điểm cho lớp không thuộc mình
+  - admin duyệt điểm và student chỉ thấy điểm đã duyệt
+- Đã chạy `conda run -n cnm python manage.py test` và pass `10/10`.
+
+### ✅ Added: Public landing page for first-time visitors
+- **Files:** `frontend/home.html`, `frontend/css/style.css`, `frontend/index.html`, `frontend/register.html`, `early_waring_backend/early_waring_backend/urls.py`
+- Bổ sung trang chủ giới thiệu riêng cho hệ thống thay vì vào thẳng form login.
+- Route `/` giờ trỏ tới landing page; `index.html` vẫn là trang đăng nhập riêng.
+- Landing page có giới thiệu tính năng, workflow, role, và CTA đi tới login/register.
+- Login/Register cũng được thêm link quay về trang giới thiệu.
+
+### ✅ Improved: Admin MLOps now shows retrain state clearly
+- **Files:** `early_waring_backend/core/views.py`, `frontend/admin.html`, `early_waring_backend/core/tests.py`
+- Bổ sung trạng thái retrain có thể theo dõi được: `running`, `completed`, `error`, `idle`.
+- Khi admin bấm chạy pipeline, backend lưu trạng thái hiện tại vào file status trong `ml/saved_models`.
+- Màn MLOps của admin giờ hiển thị badge trạng thái, message, thời gian cập nhật gần nhất, và tự polling khi pipeline đang chạy.
+- Nếu pipeline đang chạy sẵn, API sẽ trả về trạng thái hiện tại thay vì cho chạy chồng.
+- Thêm test backend cho `GET /api/admin/mlops/status/`.
+- Đã chạy lại `conda run -n cnm python manage.py test` và pass `11/11`.
+
+### ✅ Fixed: Performance Distribution hiển thị lại đúng trên dashboard
+- **Files:** `early_waring_backend/core/models.py`, `early_waring_backend/core/views.py`, `frontend/teacher.html`, `early_waring_backend/core/tests.py`
+- Sửa nguyên nhân khiến biểu đồ `Performance Distribution` bị trắng: dữ liệu điểm cũ có `final_score` nhưng `performance_label` đang rỗng.
+- `BangDiem.save()` giờ tự tính cả `performance_label` từ `final_score`, nên các điểm mới sẽ luôn có xếp loại đầy đủ.
+- Dashboard admin và dashboard lớp của teacher giờ có fallback suy ra label trực tiếp từ `final_score`, nên dữ liệu cũ cũng hiển thị được ngay mà không cần nhập lại điểm.
+- Ổn định thứ tự hiển thị biểu đồ label ở giao diện teacher theo `Excellent / Good / Average / Weak`.
+- Thêm test đảm bảo dashboard vẫn trả `phan_bo_label` đúng kể cả khi bản ghi cũ có `performance_label=''`.
+
+### ✅ Improved: MLOps dashboard now shows current production metrics clearly
+- **Files:** `early_waring_backend/core/views.py`, `frontend/admin.html`, `early_waring_backend/core/tests.py`
+- Sửa màn MLOps để không còn phụ thuộc hoàn toàn vào `last_retrain_result.json` cho phần metric hiển thị.
+- API `/api/admin/mlops/status/` giờ trả thêm `current_model.metrics` lấy trực tiếp từ `ml/saved_models/model_metadata.json`.
+- Màn admin giờ hiển thị đúng metric của model production hiện tại gồm `F1-score`, `Accuracy`, `Recall`.
+- `Last Retrain` giờ có fallback sang thời điểm model hiện tại được cập nhật nếu chưa có file lịch sử retrain.
+- Khung `Last Retrain Result` cũng hiển thị được thông tin model hiện tại kể cả khi chưa lưu được lịch sử retrain đầy đủ.
+- Thêm test backend bảo đảm MLOps status trả được metric hiện tại từ metadata.

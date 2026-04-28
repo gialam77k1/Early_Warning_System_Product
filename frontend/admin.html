@@ -1142,7 +1142,10 @@ async function loadMlops() {
   }
   const data = await resp.json();
   document.getElementById('mlModelStatus').textContent = data.model_exists ? (data.model_name || 'Unknown') : 'No model';
-  document.getElementById('mlF1Score').textContent = data.last_retrain?.new_f1 ? data.last_retrain.new_f1.toFixed(4) : '—';
+  const currentMetrics = data.current_model?.metrics || {};
+  document.getElementById('mlF1Score').textContent = currentMetrics.f1_macro != null
+    ? Number(currentMetrics.f1_macro).toFixed(4)
+    : data.last_retrain?.new_f1 ? data.last_retrain.new_f1.toFixed(4) : '—';
   document.getElementById('mlLastRun').textContent = data.last_retrain?.run_time ? formatDate(data.last_retrain.run_time) : 'Chưa có';
   const retrainState = data.retrain_status?.state || 'idle';
   const retrainBtn = document.getElementById('retrainBtn');
@@ -1170,6 +1173,8 @@ async function loadMlops() {
       <div><strong>Winning model:</strong> ${escapeHtml(data.last_retrain.winning_model || data.model_name || '—')}</div>
       <div><strong>Old F1:</strong> ${data.last_retrain.old_f1 ?? '—'}</div>
       <div><strong>New F1:</strong> ${data.last_retrain.new_f1 ?? '—'}</div>
+      <div><strong>Accuracy:</strong> ${data.last_retrain.accuracy ?? currentMetrics.accuracy ?? '—'}</div>
+      <div><strong>Recall:</strong> ${data.last_retrain.recall_macro ?? currentMetrics.recall_macro ?? '—'}</div>
       <div><strong>New samples:</strong> ${data.last_retrain.new_samples ?? 0}</div>
       <div><strong>Status:</strong> ${escapeHtml(data.last_retrain.reason || '—')}</div>
     </div>
