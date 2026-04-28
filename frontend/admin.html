@@ -41,9 +41,6 @@
       <div class="nav-item" onclick="showSection('scores')" id="nav-scores">
         <span class="icon">📝</span> Gradebook
       </div>
-      <div class="nav-item" onclick="showSection('warnings')" id="nav-warnings">
-        <span class="icon">⚠️</span> Warnings
-      </div>
       <div class="nav-item" onclick="showSection('mlops')" id="nav-mlops">
         <span class="icon">⚡</span> MLOps
       </div>
@@ -211,25 +208,6 @@
                 </tr>
               </thead>
               <tbody id="scoreTable"><tr><td colspan="8" style="text-align:center"><div class="spinner"></div></td></tr></tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-
-      <!-- ═══ WARNINGS ═══ -->
-      <div id="sec-warnings" class="section">
-        <div class="alert-at-risk">
-            <span class="icon">⚠️</span>
-            <span>Multiple students identified with high failure risk. Immediate intervention recommended.</span>
-        </div>
-        <div class="card">
-          <div class="card-title">Critical Alerts</div>
-          <div class="table-wrap">
-            <table>
-              <thead>
-                <tr><th>ID</th><th>Name</th><th>Class</th><th>Overall</th><th>Prediction</th><th>Risk Level</th></tr>
-              </thead>
-              <tbody id="warningTable"><tr><td colspan="6" style="text-align:center"><div class="spinner"></div></td></tr></tbody>
             </table>
           </div>
         </div>
@@ -583,7 +561,6 @@ const sectionConfig = {
   teachers: { title: 'Teachers', desc: 'Teacher directory with search by name', load: loadTeachers },
   classes: { title: 'Manage Classes', desc: 'Create classes and assign teachers', load: loadClasses },
   scores: { title: 'Gradebook', desc: 'Teacher-submitted grades waiting for admin approval', load: loadScores },
-  warnings: { title: 'Warnings', desc: 'Official approved warnings from the prediction model', load: loadWarningsData },
   mlops: { title: 'MLOps Dashboard', desc: 'Check model status and trigger retraining', load: loadMlops },
 };
 
@@ -1097,7 +1074,7 @@ async function approveScore(scoreId) {
   const resp = await api.put(`/admin/scores/${scoreId}/approve/`, { action: 'approve' });
   if (resp && resp.ok) {
     showToast('Đã duyệt điểm.');
-    await Promise.all([loadScores(), loadDashboard(), loadWarningsData()]);
+    await Promise.all([loadScores(), loadDashboard()]);
   } else {
     const data = resp ? await resp.json().catch(() => ({})) : null;
     showToast(getErrorMessage(data), 'error');
@@ -1109,27 +1086,11 @@ async function rejectScore(scoreId) {
   const resp = await api.put(`/admin/scores/${scoreId}/approve/`, { action: 'reject' });
   if (resp && (resp.ok || resp.status === 204)) {
     showToast('Đã từ chối điểm.');
-    await Promise.all([loadScores(), loadDashboard(), loadWarningsData()]);
+    await Promise.all([loadScores(), loadDashboard()]);
   } else {
     const data = resp ? await resp.json().catch(() => ({})) : null;
     showToast(getErrorMessage(data), 'error');
   }
-}
-
-async function loadWarningsData() {
-  const resp = await api.get('/predictions/warnings/');
-  if (!resp || !resp.ok) return;
-  const data = await resp.json();
-  document.getElementById('warningTable').innerHTML = data.results?.length ? data.results.map((w) => `
-    <tr>
-      <td>#${escapeHtml(w.ma_hoc_vien)}</td>
-      <td><strong>${escapeHtml(w.ho_ten)}</strong></td>
-      <td>${escapeHtml(w.lop || '—')}</td>
-      <td>${formatScore(w.final_score)}</td>
-      <td>${escapeHtml(w.predicted_label)}</td>
-      <td>${getRiskBadge(w.risk_level)}</td>
-    </tr>
-  `).join('') : '<tr><td colspan="6" style="text-align:center">Chưa có cảnh báo chính thức.</td></tr>';
 }
 
 async function loadMlops() {

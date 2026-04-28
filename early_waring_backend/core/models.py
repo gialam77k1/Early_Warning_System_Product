@@ -72,7 +72,7 @@ class LopHoc(models.Model):
 
     @property
     def so_hoc_vien(self):
-        return self.hocvien_set.count()
+        return self.hoc_vien_list.count()
 
 
 class HocVien(models.Model):

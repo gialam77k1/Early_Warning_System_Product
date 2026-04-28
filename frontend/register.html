@@ -35,7 +35,10 @@
 
       <div class="form-group">
         <label class="form-label">Password</label>
-        <input id="password" type="password" class="form-control" placeholder="••••••••" required minlength="6"/>
+        <div class="password-field">
+          <input id="password" type="password" class="form-control password-input" placeholder="••••••••" required minlength="6"/>
+          <button type="button" class="password-toggle" data-target="password">Show</button>
+        </div>
       </div>
 
       <div id="registerError" class="login-error"></div>
@@ -58,6 +61,15 @@
 
 <script src="js/api.js"></script>
 <script>
+  document.querySelectorAll('.password-toggle').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const input = document.getElementById(btn.dataset.target);
+      const isHidden = input.type === 'password';
+      input.type = isHidden ? 'text' : 'password';
+      btn.textContent = isHidden ? 'Hide' : 'Show';
+    });
+  });
+
   if (api.isLoggedIn()) {
     const u = api.getUser();
     const map = { admin: 'admin.html', teacher: 'teacher.html', student: 'student.html' };

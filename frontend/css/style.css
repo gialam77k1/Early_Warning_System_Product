@@ -389,6 +389,25 @@ tbody tr:hover { background: #F9FAFB; }
   font-size: 14px; outline: none; transition: border-color 0.2s;
 }
 .form-control:focus { border-color: var(--primary); }
+.password-field {
+  position: relative;
+}
+.password-input {
+  padding-right: 72px;
+}
+.password-toggle {
+  position: absolute;
+  top: 50%;
+  right: 12px;
+  transform: translateY(-50%);
+  border: none;
+  background: transparent;
+  color: var(--primary);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 4px 6px;
+}
 
 .form-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 .form-grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }

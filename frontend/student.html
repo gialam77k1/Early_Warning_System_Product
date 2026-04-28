@@ -146,6 +146,7 @@
       <div id="sec-scores" class="section">
         <div class="card">
           <div class="card-title">My Score History</div>
+          <p style="font-size:13px; color:var(--text-secondary); margin-bottom:12px;">Click any score row to view the detailed grade breakdown.</p>
           <div class="table-wrap">
             <table>
               <thead>
@@ -179,6 +180,67 @@
 
     </div>
   </main>
+</div>
+
+<div class="modal-overlay" id="scoreDetailModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>Score Details</h2>
+      <span class="modal-close" onclick="closeScoreDetailModal()">✕</span>
+    </div>
+    <div style="display:grid; gap:14px;">
+      <div style="display:flex; justify-content:space-between; gap:16px; flex-wrap:wrap; padding:14px 16px; border:1px solid var(--border); border-radius:10px; background:#F9FAFB;">
+        <div>
+          <div style="font-size:12px; color:var(--text-secondary)">Updated At</div>
+          <div id="scoreDetailUpdatedAt" style="font-weight:700;">—</div>
+        </div>
+        <div>
+          <div style="font-size:12px; color:var(--text-secondary)">Status</div>
+          <div id="scoreDetailStatus">—</div>
+        </div>
+        <div>
+          <div style="font-size:12px; color:var(--text-secondary)">Overall</div>
+          <div id="scoreDetailOverall" style="font-weight:700;">—</div>
+        </div>
+      </div>
+      <div class="grid-2" style="margin-bottom:0;">
+        <div class="card" style="margin-bottom:0; padding:18px;">
+          <div class="card-title" style="margin-bottom:14px;">Assessment Breakdown</div>
+          <div style="display:grid; gap:10px;">
+            <div style="display:flex; justify-content:space-between; gap:12px;"><span>Homework 1</span><strong id="scoreDetailHw1">—</strong></div>
+            <div style="display:flex; justify-content:space-between; gap:12px;"><span>Homework 2</span><strong id="scoreDetailHw2">—</strong></div>
+            <div style="display:flex; justify-content:space-between; gap:12px;"><span>Homework 3</span><strong id="scoreDetailHw3">—</strong></div>
+            <div style="display:flex; justify-content:space-between; gap:12px;"><span>Quiz 1</span><strong id="scoreDetailQuiz1">—</strong></div>
+            <div style="display:flex; justify-content:space-between; gap:12px;"><span>Quiz 2</span><strong id="scoreDetailQuiz2">—</strong></div>
+            <div style="display:flex; justify-content:space-between; gap:12px;"><span>Midterm</span><strong id="scoreDetailMidterm">—</strong></div>
+            <div style="display:flex; justify-content:space-between; gap:12px;"><span>Final Exam</span><strong id="scoreDetailFinal">—</strong></div>
+            <div style="display:flex; justify-content:space-between; gap:12px;"><span>Attendance</span><strong id="scoreDetailAttendance">—</strong></div>
+          </div>
+        </div>
+        <div class="card" style="margin-bottom:0; padding:18px;">
+          <div class="card-title" style="margin-bottom:14px;">Prediction Summary</div>
+          <div style="display:grid; gap:12px;">
+            <div>
+              <div style="font-size:12px; color:var(--text-secondary)">Performance Label</div>
+              <div id="scoreDetailLabel">—</div>
+            </div>
+            <div>
+              <div style="font-size:12px; color:var(--text-secondary)">Risk Level</div>
+              <div id="scoreDetailRisk">—</div>
+            </div>
+            <div>
+              <div style="font-size:12px; color:var(--text-secondary)">Model</div>
+              <div id="scoreDetailModel">—</div>
+            </div>
+            <div>
+              <div style="font-size:12px; color:var(--text-secondary)">Confidence Snapshot</div>
+              <div id="scoreDetailConfidence" style="font-size:14px; color:var(--text-main);">—</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
 </div>
 
 <div class="modal-overlay" id="profileModal">
@@ -226,10 +288,16 @@ if (user) {
 }
 
 let radarChart, probChart;
+let scoreHistoryData = [];
 
 function formatScore(score) {
   const num = Number(score);
   return Number.isFinite(num) ? `${num.toFixed(1)}/10` : '—';
+}
+
+function formatPercent(value) {
+  const num = Number(value);
+  return Number.isFinite(num) ? `${(num * 100).toFixed(0)}%` : '—';
 }
 
 function applyProfileToUI(currentUser) {
@@ -242,8 +310,9 @@ function applyProfileToUI(currentUser) {
 }
 
 function renderScoreHistory(scores) {
+  scoreHistoryData = scores;
   document.getElementById('scoreHistoryTable').innerHTML = scores.length ? scores.map((score) => `
-    <tr>
+    <tr onclick="openScoreDetailModal(${score.id})" style="cursor:pointer">
       <td>${new Date(score.updated_at).toLocaleString('vi-VN')}</td>
       <td>${formatScore((score.homework_1 + score.homework_2 + score.homework_3) / 3)}</td>
       <td>${formatScore((score.quiz_1 + score.quiz_2) / 2)}</td>
@@ -253,6 +322,41 @@ function renderScoreHistory(scores) {
       <td>${score.is_approved ? '<span class="badge badge-green">Approved</span>' : '<span class="badge badge-orange">Pending</span>'}</td>
     </tr>
   `).join('') : '<tr><td colspan="7" style="text-align:center">Chưa có điểm được duyệt.</td></tr>';
+}
+
+function openScoreDetailModal(scoreId) {
+  const score = scoreHistoryData.find((item) => item.id === scoreId);
+  if (!score) return;
+  const prediction = score.du_doan || null;
+  const confidence = prediction
+    ? [
+        `Weak ${formatPercent(prediction.prob_weak)}`,
+        `Average ${formatPercent(prediction.prob_average)}`,
+        `Good ${formatPercent(prediction.prob_good)}`,
+        `Excellent ${formatPercent(prediction.prob_excellent)}`,
+      ].join(' • ')
+    : 'No prediction available';
+
+  document.getElementById('scoreDetailUpdatedAt').textContent = new Date(score.updated_at).toLocaleString('vi-VN');
+  document.getElementById('scoreDetailStatus').innerHTML = score.is_approved ? '<span class="badge badge-green">Approved</span>' : '<span class="badge badge-orange">Pending</span>';
+  document.getElementById('scoreDetailOverall').textContent = formatScore(score.final_score);
+  document.getElementById('scoreDetailHw1').textContent = formatScore(score.homework_1);
+  document.getElementById('scoreDetailHw2').textContent = formatScore(score.homework_2);
+  document.getElementById('scoreDetailHw3').textContent = formatScore(score.homework_3);
+  document.getElementById('scoreDetailQuiz1').textContent = formatScore(score.quiz_1);
+  document.getElementById('scoreDetailQuiz2').textContent = formatScore(score.quiz_2);
+  document.getElementById('scoreDetailMidterm').textContent = formatScore(score.midterm_score);
+  document.getElementById('scoreDetailFinal').textContent = formatScore(score.final_exam);
+  document.getElementById('scoreDetailAttendance').textContent = formatPercent(score.attendance_rate);
+  document.getElementById('scoreDetailLabel').innerHTML = score.performance_label ? getLabelBadge(score.performance_label) : '—';
+  document.getElementById('scoreDetailRisk').innerHTML = prediction ? getRiskBadge(prediction.risk_level) : '—';
+  document.getElementById('scoreDetailModel').textContent = prediction?.model_name || '—';
+  document.getElementById('scoreDetailConfidence').textContent = confidence;
+  document.getElementById('scoreDetailModal').classList.add('open');
+}
+
+function closeScoreDetailModal() {
+  document.getElementById('scoreDetailModal').classList.remove('open');
 }
 
 async function loadData() {
