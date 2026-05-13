@@ -1,5 +1,24 @@
 # Changelog — EWS Platform
 
+## [2026-05-13] Render/Docker Risk Sync + Teacher Grade UX
+
+### ✅ Fixed: Retrain xong là risk prediction được cập nhật lại ngay
+- **Files:** `early_waring_backend/core/prediction_utils.py`, `early_waring_backend/core/management/commands/ml_retrain.py`, `early_waring_backend/core/views.py`
+- Thêm helper backfill `DuDoanML` dùng chung cho save grade, retrain và seed demo.
+- Sau `Run MLOps`, hệ thống tự cập nhật lại prediction cho các bảng điểm đã duyệt, nên `Risk Distribution`, teacher risk và student risk không còn bị trống chỉ vì thiếu bản ghi dự đoán.
+- Nếu dashboard/scores gặp bảng điểm approved chưa có prediction, backend sẽ tự backfill phần thiếu thay vì để giao diện hiện trắng.
+
+### ✅ Fixed: Seed demo trên Render tạo luôn prediction dùng được ngay
+- **Files:** `early_waring_backend/core/management/commands/seed_data.py`
+- Dữ liệu mẫu được tạo ở trạng thái `approved`.
+- Sau khi seed, hệ thống chạy backfill prediction để dashboard có risk chart ngay.
+
+### ✅ Improved: Teacher Update Grade modal đồng bộ theo học viên đang chọn
+- **File:** `frontend/teacher.html`
+- Đổi học viên trong modal sẽ nạp đúng bảng điểm mới nhất của học viên đó thay vì giữ dữ liệu người trước.
+- Nếu học viên chưa có điểm, modal tự chuyển về trạng thái tạo mới.
+- Bổ sung ghi chú rõ `Final Exam` không phải feature dùng để dự đoán risk.
+
 ## [2026-04-23] Major Admin Dashboard Fixes & Features
 
 ### ✅ Fixed: Add Class Button Not Working

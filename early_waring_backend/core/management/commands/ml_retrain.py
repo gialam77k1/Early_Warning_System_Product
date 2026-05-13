@@ -6,6 +6,7 @@ import json
 from datetime import datetime
 from django.core.management.base import BaseCommand
 from core.models import BangDiem
+from core.prediction_utils import backfill_predictions_for_scores
 from ml.mlflow_manager import MLflowManager
 from ml.train_model import FEATURE_COLUMNS, TARGET_COLUMN, LABEL_ORDER, get_models, evaluate_model
 from sklearn.model_selection import train_test_split
@@ -22,6 +23,20 @@ SAFETY_THRESHOLD = 0.75
 class Command(BaseCommand):
     help = 'Retrain ML model using COMBINED old + new data, track with MLflow'
 
+    def _refresh_predictions(self, queryset, reason):
+        try:
+            stats = backfill_predictions_for_scores(queryset, only_approved=True)
+            self.stdout.write(
+                self.style.SUCCESS(
+                    f'🔁 Đã cập nhật lại risk predictions ({reason}): '
+                    f'{stats["processed"]} scores | +{stats["created"]} mới | {stats["updated"]} cập nhật'
+                )
+            )
+            return stats
+        except Exception as e:
+            self.stdout.write(self.style.WARNING(f'Không thể backfill predictions sau retrain: {e}'))
+            return {'processed': 0, 'created': 0, 'updated': 0}
+
     def handle(self, *args, **options):
         self.stdout.write(self.style.SUCCESS('--- BẮT ĐẦU QUY TRÌNH MLOPS PIPELINE ---'))
 
@@ -29,6 +44,7 @@ class Command(BaseCommand):
         BASE_DIR = os.path.dirname(
             os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
         )
+        output_dir = os.path.abspath(os.path.join(BASE_DIR, '..', 'ml', 'saved_models'))
         ref_path = os.path.join(BASE_DIR, '..', 'data_train', 'train_dataset.csv')
 
         if not os.path.exists(ref_path):
@@ -45,10 +61,27 @@ class Command(BaseCommand):
         self.stdout.write(f'Tìm thấy {new_count} bản ghi mới trong Database.')
 
         if new_count < MIN_NEW_RECORDS:
+            refresh_stats = self._refresh_predictions(BangDiem.objects.filter(is_approved=True), 'SKIPPED')
             self.stdout.write(self.style.WARNING(
                 f'Dữ liệu mới chưa đủ ({new_count}/{MIN_NEW_RECORDS}). '
                 f'Bỏ qua retraining, giữ nguyên model hiện tại.'
             ))
+            result_path = os.path.join(output_dir, 'last_retrain_result.json')
+            os.makedirs(os.path.dirname(result_path), exist_ok=True)
+            with open(result_path, 'w', encoding='utf-8') as f:
+                json.dump({
+                    'run_time': datetime.now().isoformat(),
+                    'original_samples': len(df_original),
+                    'new_samples': new_count,
+                    'total_samples': len(df_original) + new_count,
+                    'drift_detected': False,
+                    'old_f1': None,
+                    'new_f1': None,
+                    'winning_model': None,
+                    'decision': 'SKIPPED',
+                    'reason': f'Không đủ dữ liệu mới ({new_count}/{MIN_NEW_RECORDS})',
+                    'prediction_refresh': refresh_stats,
+                }, f, indent=4, ensure_ascii=False)
             return
 
         data = []
@@ -211,6 +244,8 @@ class Command(BaseCommand):
                 decision = "REJECTED"
                 status_msg = f"Rejected: {reason}"
 
+            refresh_stats = self._refresh_predictions(BangDiem.objects.filter(is_approved=True), decision)
+
             # ── BƯỚC 9: Lưu metadata kết quả ─────────────────────────────
             output_dir = os.path.dirname(current_model_path)
             os.makedirs(output_dir, exist_ok=True)
@@ -226,6 +261,7 @@ class Command(BaseCommand):
                 'winning_model':     best_model_name,
                 'decision':          decision,
                 'reason':            status_msg,
+                'prediction_refresh': refresh_stats,
             }
             result_path = os.path.join(output_dir, 'last_retrain_result.json')
             with open(result_path, 'w', encoding='utf-8') as f:

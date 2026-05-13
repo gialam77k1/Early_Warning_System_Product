@@ -213,9 +213,10 @@
           <div class="form-group"><label class="form-label">Quiz1</label><input name="quiz_1" id="f_q1" type="number" class="form-control" step="0.1"/></div>
           <div class="form-group"><label class="form-label">Quiz2</label><input name="quiz_2" id="f_q2" type="number" class="form-control" step="0.1"/></div>
           <div class="form-group"><label class="form-label">Midterm</label><input name="midterm_score" id="f_gk" type="number" class="form-control" step="0.1"/></div>
-          <div class="form-group"><label class="form-label">Final</label><input name="final_exam" id="f_ck" type="number" class="form-control" step="0.1"/></div>
+          <div class="form-group"><label class="form-label">Final <span style="font-size:11px;color:var(--text-secondary)">(không dùng cho risk prediction)</span></label><input name="final_exam" id="f_ck" type="number" class="form-control" step="0.1"/></div>
           <div class="form-group"><label class="form-label">Attendance</label><input name="attendance_rate" id="f_cc" type="number" class="form-control" step="0.01"/></div>
         </div>
+        <p style="margin:0 0 12px;color:var(--text-secondary);font-size:12px">Risk prediction dùng HW + Quiz + Midterm + Attendance. Final Exam chỉ phục vụ điểm tổng kết và phê duyệt bảng điểm.</p>
         <div class="modal-footer">
           <button type="button" class="btn btn-outline" onclick="closeScoreModal()">Cancel</button>
           <button type="submit" class="btn btn-primary">Save & Predict</button>
@@ -400,6 +401,38 @@ function getLatestScoreMap() {
   return map;
 }
 
+function resetScoreFormFields() {
+  ['f_hw1', 'f_hw2', 'f_hw3', 'f_q1', 'f_q2', 'f_gk', 'f_ck', 'f_cc'].forEach((id) => {
+    document.getElementById(id).value = '';
+  });
+}
+
+function fillScoreForm(score) {
+  if (!score) {
+    resetScoreFormFields();
+    return;
+  }
+  document.getElementById('f_hw1').value = score.homework_1 ?? '';
+  document.getElementById('f_hw2').value = score.homework_2 ?? '';
+  document.getElementById('f_hw3').value = score.homework_3 ?? '';
+  document.getElementById('f_q1').value = score.quiz_1 ?? '';
+  document.getElementById('f_q2').value = score.quiz_2 ?? '';
+  document.getElementById('f_gk').value = score.midterm_score ?? '';
+  document.getElementById('f_ck').value = score.final_exam ?? '';
+  document.getElementById('f_cc').value = score.attendance_rate ?? '';
+}
+
+function syncScoreFormToSelectedStudent(studentId) {
+  const normalizedStudentId = Number(studentId);
+  const selectedStudent = currentStudents.find((student) => student.id === normalizedStudentId);
+  const existingScore = getLatestScoreMap().get(normalizedStudentId) || null;
+  document.getElementById('editScoreId').value = existingScore?.id || '';
+  document.getElementById('modalStudentName').textContent = selectedStudent
+    ? `Grades - ${selectedStudent.ho_ten}`
+    : 'Enter Grades';
+  fillScoreForm(existingScore);
+}
+
 function renderScoreTable() {
   const scoreMap = getLatestScoreMap();
   const rows = currentStudents.map((student) => {
@@ -523,7 +556,7 @@ function showSection(name) {
         document.getElementById('myClassesTable').innerHTML = myClasses.map(c => `
             <tr>
                 <td><strong>${c.ten_lop}</strong></td><td>${c.nam_hoc}</td><td>${c.hoc_ky}</td>
-                <td>${c.so_hoc_vien}</td>
+                <td>${c.so_hoc_vien ?? 0}</td>
                 <td><span class="badge ${c.is_active ? 'badge-green' : 'badge-orange'}">${c.is_active ? 'Active' : 'Archived'}</span></td>
             </tr>
         `).join('');
@@ -535,39 +568,35 @@ function showSection(name) {
 }
 
 function populateStudentSelect(selectedStudentId = '') {
-    const scoreMap = getLatestScoreMap();
-    const options = currentStudents.map((student) => {
-        const score = scoreMap.get(student.id);
+  const scoreMap = getLatestScoreMap();
+  const options = currentStudents.map((student) => {
+    const score = scoreMap.get(student.id);
         const suffix = score && score.id !== Number(document.getElementById('editScoreId').value || 0) ? ' (đã có điểm)' : '';
         return `<option value="${student.id}">${escapeHtml(student.ho_ten)} - ${escapeHtml(student.ma_hoc_vien)}${suffix}</option>`;
     }).join('');
-    const select = document.getElementById('editHvId');
-    select.innerHTML = `<option value="">-- Select Student --</option>${options}`;
-    if (selectedStudentId) select.value = selectedStudentId;
+  const select = document.getElementById('editHvId');
+  select.innerHTML = `<option value="">-- Select Student --</option>${options}`;
+  if (selectedStudentId) select.value = selectedStudentId;
 }
 
 function openCreateScoreModal(studentId = '') {
-    document.getElementById('modalStudentName').textContent = 'Enter Grades';
     document.getElementById('scoreForm').reset();
     document.getElementById('editScoreId').value = '';
     populateStudentSelect(studentId);
+    if (studentId) {
+      syncScoreFormToSelectedStudent(studentId);
+    } else {
+      document.getElementById('modalStudentName').textContent = 'Enter Grades';
+      resetScoreFormFields();
+    }
     document.getElementById('scoreModal').classList.add('open');
 }
 
 function openScoreModal(scoreId) {
     const s = allScores.find(x => x.id === scoreId);
     if (!s) return;
-    document.getElementById('modalStudentName').textContent = `Grades - ${s.hoc_vien_ten}`;
-    document.getElementById('editScoreId').value = s.id;
     populateStudentSelect(String(s.hoc_vien));
-    document.getElementById('f_hw1').value = s.homework_1;
-    document.getElementById('f_hw2').value = s.homework_2;
-    document.getElementById('f_hw3').value = s.homework_3;
-    document.getElementById('f_q1').value = s.quiz_1;
-    document.getElementById('f_q2').value = s.quiz_2;
-    document.getElementById('f_gk').value = s.midterm_score;
-    document.getElementById('f_ck').value = s.final_exam;
-    document.getElementById('f_cc').value = s.attendance_rate;
+    syncScoreFormToSelectedStudent(s.hoc_vien);
     document.getElementById('scoreModal').classList.add('open');
 }
 
@@ -587,6 +616,17 @@ function openProfileModal() {
 function closeProfileModal() {
     document.getElementById('profileModal').classList.remove('open');
 }
+
+document.getElementById('editHvId').addEventListener('change', (e) => {
+    const studentId = e.target.value;
+    if (!studentId) {
+      document.getElementById('editScoreId').value = '';
+      document.getElementById('modalStudentName').textContent = 'Enter Grades';
+      resetScoreFormFields();
+      return;
+    }
+    syncScoreFormToSelectedStudent(studentId);
+});
 
 document.getElementById('scoreForm').addEventListener('submit', async (e) => {
     e.preventDefault();

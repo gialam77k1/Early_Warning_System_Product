@@ -5,7 +5,6 @@
 =============================================================
 """
 
-import sys
 import os
 import io
 import json
@@ -21,6 +20,12 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from .models import NguoiDung, LopHoc, HocVien, BangDiem, DuDoanML
+from .prediction_utils import (
+    backfill_predictions_for_scores,
+    get_model_name,
+    load_predictor,
+    upsert_prediction_for_score,
+)
 from .serializers import (
     LoginSerializer, RegisterSerializer, NguoiDungSerializer,
     LopHocSerializer, LopHocDetailSerializer,
@@ -426,6 +431,7 @@ class HocVienProgressView(APIView):
         bang_diems = BangDiem.objects.filter(hoc_vien=hv).prefetch_related('du_doan')
         if request.user.vai_tro == 'student':
             bang_diems = bang_diems.filter(is_approved=True)
+        _ensure_prediction_coverage(bang_diems, only_approved=(request.user.vai_tro == 'student'))
         bang_diem_data = BangDiemSerializer(bang_diems, many=True).data
 
         # Tổng hợp tiến độ
@@ -477,6 +483,8 @@ class BangDiemListView(APIView):
             bang_diems = bang_diems.filter(hoc_vien_id=hoc_vien_id)
         if lop_id:
             bang_diems = bang_diems.filter(hoc_vien__lop_id=lop_id)
+
+        _ensure_prediction_coverage(bang_diems, only_approved=False)
 
         serializer = BangDiemSerializer(bang_diems, many=True)
         return Response({'count': bang_diems.count(), 'results': serializer.data})
@@ -585,29 +593,13 @@ class BangDiemDetailView(APIView):
 # =============================================================
 
 def _load_predictor():
-    """Load StudentPredictor từ ml/predict.py — lazy loading"""
-    ml_root = os.path.join(settings.ML_MODEL_DIR, '..', '..')
-    ml_dir = os.path.join(settings.BASE_DIR, '..', 'ml')
-    ml_dir = os.path.abspath(ml_dir)
-    if ml_dir not in sys.path:
-        sys.path.insert(0, ml_dir)
-    from predict import StudentPredictor
-    return StudentPredictor()
+    """Load predictor dùng chung cho các luồng predict/backfill."""
+    return load_predictor()
 
 
 def _get_model_name():
-    """Đọc tên model thực tế từ model_metadata.json (tránh hardcode)."""
-    import json
-    try:
-        metadata_path = os.path.join(
-            os.path.abspath(os.path.join(settings.BASE_DIR, '..', 'ml')),
-            'saved_models', 'model_metadata.json'
-        )
-        with open(metadata_path, 'r', encoding='utf-8') as f:
-            metadata = json.load(f)
-        return metadata.get('model_name', 'Unknown')
-    except Exception:
-        return 'Unknown'
+    """Đọc tên model thực tế từ metadata."""
+    return get_model_name()
 
 
 def _get_model_metadata():
@@ -690,26 +682,23 @@ def _auto_predict(bang_diem: BangDiem):
     Được gọi sau khi nhập / cập nhật điểm.
     """
     try:
-        predictor = _load_predictor()
-        features = bang_diem.get_features()
-        result = predictor.predict_single(**features)
-
-        proba = result['probabilities']
-        # Upsert DuDoanML (tạo mới hoặc cập nhật nếu đã tồn tại)
-        DuDoanML.objects.update_or_create(
-            bang_diem=bang_diem,
-            defaults={
-                'predicted_label': result['predicted_label'],
-                'prob_weak': proba.get('Weak', 0),
-                'prob_average': proba.get('Average', 0),
-                'prob_good': proba.get('Good', 0),
-                'prob_excellent': proba.get('Excellent', 0),
-                'model_name': _get_model_name(),
-            }
-        )
+        upsert_prediction_for_score(bang_diem)
     except Exception as e:
         # Không raise — predict lỗi không ảnh hưởng việc lưu điểm
         print(f"[WARN] Auto-predict thất bại: {e}")
+
+
+def _ensure_prediction_coverage(score_queryset, only_approved=True):
+    missing_queryset = score_queryset.filter(du_doan__isnull=True)
+    if only_approved:
+        missing_queryset = missing_queryset.filter(is_approved=True)
+    if not missing_queryset.exists():
+        return {'processed': 0, 'created': 0, 'updated': 0}
+    try:
+        return backfill_predictions_for_scores(missing_queryset, only_approved=only_approved)
+    except Exception as e:
+        print(f"[WARN] Prediction backfill skipped: {e}")
+        return {'processed': 0, 'created': 0, 'updated': 0}
 
 
 class PredictView(APIView):
@@ -1173,6 +1162,7 @@ class DashboardView(APIView):
         tong_lop = LopHoc.objects.count()
         tong_gv = NguoiDung.objects.filter(vai_tro='teacher').count()
         approved_scores = BangDiem.objects.filter(is_approved=True)
+        _ensure_prediction_coverage(approved_scores, only_approved=True)
         tong_bd = approved_scores.count()
         tong_dd = DuDoanML.objects.filter(bang_diem__is_approved=True).count()
 
@@ -1239,6 +1229,7 @@ class DashboardClassView(APIView):
 
         hoc_viens = HocVien.objects.filter(lop=lop)
         bang_diems = BangDiem.objects.filter(hoc_vien__lop=lop, is_approved=True)
+        _ensure_prediction_coverage(bang_diems, only_approved=True)
         du_doans = DuDoanML.objects.filter(bang_diem__hoc_vien__lop=lop, bang_diem__is_approved=True)
 
         # Thống kê điểm

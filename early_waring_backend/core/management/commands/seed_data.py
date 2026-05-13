@@ -5,8 +5,8 @@ Chạy: python manage.py seed_data
 
 import random
 from django.core.management.base import BaseCommand
-from django.contrib.auth.hashers import make_password
 from core.models import NguoiDung, LopHoc, HocVien, BangDiem
+from core.prediction_utils import backfill_predictions_for_scores
 
 
 class Command(BaseCommand):
@@ -139,9 +139,18 @@ class Command(BaseCommand):
                         midterm_score=round(random.uniform(*score_range), 1),
                         final_exam=round(random.uniform(*score_range), 1),
                         attendance_rate=att,
+                        is_approved=True,
+                        approved_by=admin,
                     )
 
         self.stdout.write(self.style.SUCCESS(f"✅ Tạo {student_count} học viên + bảng điểm"))
+        prediction_stats = backfill_predictions_for_scores(BangDiem.objects.filter(is_approved=True), only_approved=True)
+        self.stdout.write(
+            self.style.SUCCESS(
+                f"✅ Backfill risk prediction: {prediction_stats['processed']} scores | "
+                f"+{prediction_stats['created']} mới | {prediction_stats['updated']} cập nhật"
+            )
+        )
 
         # ========== Tổng kết ==========
         self.stdout.write("\n" + "=" * 50)
