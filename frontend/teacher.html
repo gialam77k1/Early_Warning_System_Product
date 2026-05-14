@@ -297,12 +297,22 @@ function escapeHtml(value) {
 
 function formatScore(score) {
   const num = Number(score);
-  return Number.isFinite(num) ? `${num.toFixed(1)}/10` : '—';
+  return score !== null && score !== undefined && score !== '' && Number.isFinite(num) ? `${num.toFixed(1)}/10` : '—';
+}
+
+function isFilled(value) {
+  return value !== null && value !== undefined && value !== '';
+}
+
+function averageIfComplete(values) {
+  if (!values.every(isFilled)) return null;
+  const nums = values.map(Number);
+  return nums.every(Number.isFinite) ? nums.reduce((sum, value) => sum + value, 0) / nums.length : null;
 }
 
 function getScoreAverage(score) {
   if (!score) return null;
-  return (Number(score.homework_1) + Number(score.homework_2) + Number(score.homework_3)) / 3;
+  return averageIfComplete([score.homework_1, score.homework_2, score.homework_3]);
 }
 
 function applyProfileToUI(currentUser) {
@@ -634,7 +644,7 @@ document.getElementById('scoreForm').addEventListener('submit', async (e) => {
     const payload = {};
     fd.forEach((v, k) => {
         if (k === 'score_id') return;
-        payload[k] = k === 'hoc_vien' ? Number(v) : Number(v);
+        payload[k] = k === 'hoc_vien' ? Number(v) : (String(v).trim() === '' ? null : Number(v));
     });
     const scoreId = document.getElementById('editScoreId').value;
     

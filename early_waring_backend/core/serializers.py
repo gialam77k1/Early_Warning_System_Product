@@ -183,6 +183,14 @@ class BangDiemSerializer(serializers.ModelSerializer):
 
 class BangDiemCreateSerializer(serializers.ModelSerializer):
     """Serializer tạo/cập nhật bảng điểm (giáo viên nhập điểm)"""
+    homework_1 = serializers.FloatField(min_value=0, max_value=10, required=False, allow_null=True)
+    homework_2 = serializers.FloatField(min_value=0, max_value=10, required=False, allow_null=True)
+    homework_3 = serializers.FloatField(min_value=0, max_value=10, required=False, allow_null=True)
+    quiz_1 = serializers.FloatField(min_value=0, max_value=10, required=False, allow_null=True)
+    quiz_2 = serializers.FloatField(min_value=0, max_value=10, required=False, allow_null=True)
+    midterm_score = serializers.FloatField(min_value=0, max_value=10, required=False, allow_null=True)
+    final_exam = serializers.FloatField(min_value=0, max_value=10, required=False, allow_null=True)
+    attendance_rate = serializers.FloatField(min_value=0, max_value=1, required=False, allow_null=True)
 
     class Meta:
         model = BangDiem
@@ -223,7 +231,6 @@ class PredictManualSerializer(serializers.Serializer):
     quiz_1 = serializers.FloatField(min_value=0, max_value=10)
     quiz_2 = serializers.FloatField(min_value=0, max_value=10)
     midterm_score = serializers.FloatField(min_value=0, max_value=10)
-    final_exam = serializers.FloatField(min_value=0, max_value=10)
     attendance_rate = serializers.FloatField(min_value=0, max_value=1)
 
 

@@ -33,6 +33,9 @@ def get_model_name():
 
 
 def upsert_prediction_for_score(bang_diem, predictor=None, model_name=None):
+    if not bang_diem.has_complete_prediction_inputs():
+        return None, False
+
     predictor = predictor or load_predictor()
     model_name = model_name or get_model_name()
 
@@ -58,7 +61,15 @@ def backfill_predictions_for_scores(score_queryset=None, only_approved=False):
         queryset = queryset.filter(is_approved=True)
 
     scores = list(
-        queryset.select_related('hoc_vien', 'hoc_vien__nguoi_dung', 'hoc_vien__lop').order_by('id')
+        queryset.filter(
+            homework_1__isnull=False,
+            homework_2__isnull=False,
+            homework_3__isnull=False,
+            quiz_1__isnull=False,
+            quiz_2__isnull=False,
+            midterm_score__isnull=False,
+            attendance_rate__isnull=False,
+        ).select_related('hoc_vien', 'hoc_vien__nguoi_dung', 'hoc_vien__lop').order_by('id')
     )
     if not scores:
         return {

@@ -292,12 +292,26 @@ let scoreHistoryData = [];
 
 function formatScore(score) {
   const num = Number(score);
-  return Number.isFinite(num) ? `${num.toFixed(1)}/10` : '—';
+  return score !== null && score !== undefined && score !== '' && Number.isFinite(num) ? `${num.toFixed(1)}/10` : '—';
 }
 
 function formatPercent(value) {
   const num = Number(value);
-  return Number.isFinite(num) ? `${(num * 100).toFixed(0)}%` : '—';
+  return value !== null && value !== undefined && value !== '' && Number.isFinite(num) ? `${(num * 100).toFixed(0)}%` : '—';
+}
+
+function isFilled(value) {
+  return value !== null && value !== undefined && value !== '';
+}
+
+function averageIfComplete(values) {
+  if (!values.every(isFilled)) return null;
+  const nums = values.map(Number);
+  return nums.every(Number.isFinite) ? nums.reduce((sum, value) => sum + value, 0) / nums.length : null;
+}
+
+function chartValue(value, multiplier = 10) {
+  return isFilled(value) && Number.isFinite(Number(value)) ? Number(value) * multiplier : null;
 }
 
 function applyProfileToUI(currentUser) {
@@ -314,8 +328,8 @@ function renderScoreHistory(scores) {
   document.getElementById('scoreHistoryTable').innerHTML = scores.length ? scores.map((score) => `
     <tr onclick="openScoreDetailModal(${score.id})" style="cursor:pointer">
       <td>${new Date(score.updated_at).toLocaleString('vi-VN')}</td>
-      <td>${formatScore((score.homework_1 + score.homework_2 + score.homework_3) / 3)}</td>
-      <td>${formatScore((score.quiz_1 + score.quiz_2) / 2)}</td>
+      <td>${formatScore(averageIfComplete([score.homework_1, score.homework_2, score.homework_3]))}</td>
+      <td>${formatScore(averageIfComplete([score.quiz_1, score.quiz_2]))}</td>
       <td>${formatScore(score.midterm_score)}</td>
       <td>${formatScore(score.final_exam)}</td>
       <td><strong>${formatScore(score.final_score)}</strong></td>
@@ -389,7 +403,7 @@ async function loadData() {
   }
 
   // Populate stats
-  document.getElementById('valAssig').textContent = formatScore((bd.homework_1+bd.homework_2+bd.homework_3)/3);
+  document.getElementById('valAssig').textContent = formatScore(averageIfComplete([bd.homework_1, bd.homework_2, bd.homework_3]));
   document.getElementById('valMid').textContent = formatScore(bd.midterm_score);
   document.getElementById('valFinal').textContent = formatScore(bd.final_exam);
   document.getElementById('valOverall').textContent = formatScore(bd.final_score);
@@ -404,7 +418,13 @@ async function loadData() {
           labels: ['HW Avg', 'Quiz Avg', 'Midterm', 'Final', 'Attendance'],
           datasets: [{
               label: 'Your Scores',
-              data: [((bd.homework_1+bd.homework_2+bd.homework_3)/3)*10, ((bd.quiz_1+bd.quiz_2)/2)*10, bd.midterm_score*10, bd.final_exam*10, bd.attendance_rate*100],
+              data: [
+                chartValue(averageIfComplete([bd.homework_1, bd.homework_2, bd.homework_3])),
+                chartValue(averageIfComplete([bd.quiz_1, bd.quiz_2])),
+                chartValue(bd.midterm_score),
+                chartValue(bd.final_exam),
+                chartValue(bd.attendance_rate, 100)
+              ],
               backgroundColor: 'rgba(0, 71, 255, 0.1)',
               borderColor: '#0047FF',
               borderWidth: 2

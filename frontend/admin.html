@@ -366,14 +366,14 @@
         <select name="hoc_vien" id="studentSelect" class="form-control" required></select>
       </div>
       <div class="form-grid-3">
-        <div class="form-group"><label class="form-label">HW1</label><input name="homework_1" type="number" class="form-control" step="0.1" required/></div>
-        <div class="form-group"><label class="form-label">HW2</label><input name="homework_2" type="number" class="form-control" step="0.1" required/></div>
-        <div class="form-group"><label class="form-label">HW3</label><input name="homework_3" type="number" class="form-control" step="0.1" required/></div>
-        <div class="form-group"><label class="form-label">Quiz1</label><input name="quiz_1" type="number" class="form-control" step="0.1" required/></div>
-        <div class="form-group"><label class="form-label">Quiz2</label><input name="quiz_2" type="number" class="form-control" step="0.1" required/></div>
-        <div class="form-group"><label class="form-label">Midterm</label><input name="midterm_score" type="number" class="form-control" step="0.1" required/></div>
-        <div class="form-group"><label class="form-label">Final</label><input name="final_exam" type="number" class="form-control" step="0.1" required/></div>
-        <div class="form-group"><label class="form-label">Attendance</label><input name="attendance_rate" type="number" class="form-control" step="0.01" required/></div>
+        <div class="form-group"><label class="form-label">HW1</label><input name="homework_1" type="number" class="form-control" step="0.1"/></div>
+        <div class="form-group"><label class="form-label">HW2</label><input name="homework_2" type="number" class="form-control" step="0.1"/></div>
+        <div class="form-group"><label class="form-label">HW3</label><input name="homework_3" type="number" class="form-control" step="0.1"/></div>
+        <div class="form-group"><label class="form-label">Quiz1</label><input name="quiz_1" type="number" class="form-control" step="0.1"/></div>
+        <div class="form-group"><label class="form-label">Quiz2</label><input name="quiz_2" type="number" class="form-control" step="0.1"/></div>
+        <div class="form-group"><label class="form-label">Midterm</label><input name="midterm_score" type="number" class="form-control" step="0.1"/></div>
+        <div class="form-group"><label class="form-label">Final</label><input name="final_exam" type="number" class="form-control" step="0.1"/></div>
+        <div class="form-group"><label class="form-label">Attendance</label><input name="attendance_rate" type="number" class="form-control" step="0.01"/></div>
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-outline" onclick="closeScoreModal()">Cancel</button>
@@ -576,7 +576,17 @@ function escapeHtml(value) {
 
 function formatScore(score) {
   const num = Number(score);
-  return Number.isFinite(num) ? `${num.toFixed(1)}/10` : '—';
+  return score !== null && score !== undefined && score !== '' && Number.isFinite(num) ? `${num.toFixed(1)}/10` : '—';
+}
+
+function isFilled(value) {
+  return value !== null && value !== undefined && value !== '';
+}
+
+function averageIfComplete(values) {
+  if (!values.every(isFilled)) return null;
+  const nums = values.map(Number);
+  return nums.every(Number.isFinite) ? nums.reduce((sum, value) => sum + value, 0) / nums.length : null;
 }
 
 function formatDate(value) {
@@ -1044,8 +1054,8 @@ async function loadScores() {
   document.getElementById('pendingTable').innerHTML = pending.length ? pending.map((r) => `
     <tr>
       <td><strong>${escapeHtml(r.hoc_vien_ten)}</strong><div style="font-size:12px;color:var(--text-secondary)">${escapeHtml(r.lop_ten || '—')}</div></td>
-      <td>${formatScore((Number(r.homework_1) + Number(r.homework_2) + Number(r.homework_3)) / 3)}</td>
-      <td>${formatScore((Number(r.quiz_1) + Number(r.quiz_2)) / 2)}</td>
+      <td>${formatScore(averageIfComplete([r.homework_1, r.homework_2, r.homework_3]))}</td>
+      <td>${formatScore(averageIfComplete([r.quiz_1, r.quiz_2]))}</td>
       <td>${formatScore(r.midterm_score)}</td>
       <td>${formatScore(r.final_exam)}</td>
       <td><strong>${formatScore(r.final_score)}</strong></td>
@@ -1059,8 +1069,8 @@ async function loadScores() {
   document.getElementById('scoreTable').innerHTML = approved.length ? approved.map((r) => `
     <tr>
       <td><strong>${escapeHtml(r.hoc_vien_ten)}</strong><div style="font-size:12px;color:var(--text-secondary)">${escapeHtml(r.lop_ten || '—')}</div></td>
-      <td>${formatScore((Number(r.homework_1) + Number(r.homework_2) + Number(r.homework_3)) / 3)}</td>
-      <td>${formatScore((Number(r.quiz_1) + Number(r.quiz_2)) / 2)}</td>
+      <td>${formatScore(averageIfComplete([r.homework_1, r.homework_2, r.homework_3]))}</td>
+      <td>${formatScore(averageIfComplete([r.quiz_1, r.quiz_2]))}</td>
       <td>${formatScore(r.midterm_score)}</td>
       <td>${formatScore(r.final_exam)}</td>
       <td><strong>${formatScore(r.final_score)}</strong></td>

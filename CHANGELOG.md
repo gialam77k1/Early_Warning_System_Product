@@ -1,5 +1,25 @@
 # Changelog — EWS Platform
 
+## [2026-05-13] Nullable Scores + No Premature Overall
+
+### ✅ Fixed: Missing grade fields no longer become `0/10`
+- **Files:** `early_waring_backend/core/models.py`, `early_waring_backend/core/serializers.py`, `early_waring_backend/core/migrations/0003_nullable_score_fields.py`
+- Các cột điểm trong `BangDiem` giờ cho phép `NULL`.
+- `final_score` và `performance_label` chỉ được tính khi đã đủ điểm để tính overall thật, bao gồm `final_exam`.
+- Nếu thiếu điểm cuối kỳ hoặc thiếu bất kỳ thành phần overall nào, UI sẽ nhận `final_score = null` thay vì `0`.
+
+### ✅ Kept: ML prediction still predicts label directly
+- **Files:** `early_waring_backend/core/prediction_utils.py`, `early_waring_backend/core/views.py`, `early_waring_backend/core/serializers.py`
+- Prediction vẫn dùng `homework_1`, `homework_2`, `homework_3`, `quiz_1`, `quiz_2`, `midterm_score`, `attendance_rate`.
+- `final_exam` không nằm trong feature dự đoán.
+- Nếu chưa đủ các feature trước cuối kỳ, hệ thống không tạo risk prediction giả.
+
+### ✅ Fixed: Frontend no longer calculates averages from blank values
+- **Files:** `frontend/admin.html`, `frontend/teacher.html`, `frontend/student.html`
+- Các ô điểm trống hiển thị `—`.
+- HW Avg, Quiz Avg, Overall và chart không còn tự ép `null` thành `0`.
+- Form nhập điểm gửi ô trống lên backend là `null`.
+
 ## [2026-05-13] Render/Docker Risk Sync + Teacher Grade UX
 
 ### ✅ Fixed: Retrain xong là risk prediction được cập nhật lại ngay

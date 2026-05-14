@@ -136,47 +136,47 @@ class BangDiem(models.Model):
 
     # 3 bài tập
     homework_1 = models.FloatField(
-        default=0, validators=score_validators,
+        null=True, blank=True, validators=score_validators,
         verbose_name='Bài tập 1'
     )
     homework_2 = models.FloatField(
-        default=0, validators=score_validators,
+        null=True, blank=True, validators=score_validators,
         verbose_name='Bài tập 2'
     )
     homework_3 = models.FloatField(
-        default=0, validators=score_validators,
+        null=True, blank=True, validators=score_validators,
         verbose_name='Bài tập 3'
     )
 
     # 2 kiểm tra nhanh
     quiz_1 = models.FloatField(
-        default=0, validators=score_validators,
+        null=True, blank=True, validators=score_validators,
         verbose_name='Kiểm tra 1'
     )
     quiz_2 = models.FloatField(
-        default=0, validators=score_validators,
+        null=True, blank=True, validators=score_validators,
         verbose_name='Kiểm tra 2'
     )
 
     # Giữa kỳ & cuối kỳ
     midterm_score = models.FloatField(
-        default=0, validators=score_validators,
+        null=True, blank=True, validators=score_validators,
         verbose_name='Điểm giữa kỳ'
     )
     final_exam = models.FloatField(
-        default=0, validators=score_validators,
+        null=True, blank=True, validators=score_validators,
         verbose_name='Điểm cuối kỳ'
     )
 
     # Tỷ lệ chuyên cần (0.0 - 1.0)
     attendance_rate = models.FloatField(
-        default=0, validators=rate_validators,
+        null=True, blank=True, validators=rate_validators,
         verbose_name='Tỷ lệ chuyên cần'
     )
 
     # Trường tính toán
     final_score = models.FloatField(
-        default=0, verbose_name='Điểm tổng kết',
+        null=True, blank=True, verbose_name='Điểm tổng kết',
         help_text='= 0.2*homework_avg + 0.2*quiz_avg + 0.25*midterm + 0.35*final_exam'
     )
 
@@ -211,8 +211,31 @@ class BangDiem(models.Model):
     def __str__(self):
         return f"Điểm {self.hoc_vien.ma_hoc_vien} - {self.final_score}"
 
+    def has_complete_final_score_inputs(self):
+        return all(
+            value is not None
+            for value in [
+                self.homework_1, self.homework_2, self.homework_3,
+                self.quiz_1, self.quiz_2,
+                self.midterm_score, self.final_exam,
+            ]
+        )
+
+    def has_complete_prediction_inputs(self):
+        return all(
+            value is not None
+            for value in [
+                self.homework_1, self.homework_2, self.homework_3,
+                self.quiz_1, self.quiz_2,
+                self.midterm_score, self.attendance_rate,
+            ]
+        )
+
     def calculate_final_score(self):
         """Tính điểm tổng kết: 0.2*hw + 0.2*quiz + 0.25*midterm + 0.35*final"""
+        if not self.has_complete_final_score_inputs():
+            self.final_score = None
+            return self.final_score
         homework_avg = (self.homework_1 + self.homework_2 + self.homework_3) / 3
         quiz_avg = (self.quiz_1 + self.quiz_2) / 2
         self.final_score = round(
@@ -223,6 +246,9 @@ class BangDiem(models.Model):
 
     def calculate_performance_label(self):
         """Suy ra xếp loại từ điểm tổng kết theo thang 10."""
+        if self.final_score is None:
+            self.performance_label = ''
+            return self.performance_label
         if self.final_score < 5.0:
             self.performance_label = self.PerformanceLabel.WEAK
         elif self.final_score < 6.5:
@@ -238,6 +264,8 @@ class BangDiem(models.Model):
         Lưu ý: final_exam không được bao gồm vì nó chỉ có sau khi thi.
         Đây mới là ý nghĩa đúng của 'Early Warning'.
         """
+        if not self.has_complete_prediction_inputs():
+            raise ValueError('Chưa đủ điểm để chạy dự đoán ML.')
         return {
             'homework_1':     self.homework_1,
             'homework_2':     self.homework_2,
@@ -253,6 +281,11 @@ class BangDiem(models.Model):
         """Auto tính final_score và performance_label khi save"""
         self.calculate_final_score()
         self.calculate_performance_label()
+        update_fields = kwargs.get('update_fields')
+        if update_fields is not None:
+            fields = set(update_fields)
+            fields.update({'final_score', 'performance_label'})
+            kwargs['update_fields'] = list(fields)
         super().save(*args, **kwargs)
 
 

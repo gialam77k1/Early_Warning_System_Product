@@ -682,6 +682,9 @@ def _auto_predict(bang_diem: BangDiem):
     Được gọi sau khi nhập / cập nhật điểm.
     """
     try:
+        if not bang_diem.has_complete_prediction_inputs():
+            DuDoanML.objects.filter(bang_diem=bang_diem).delete()
+            return
         upsert_prediction_for_score(bang_diem)
     except Exception as e:
         # Không raise — predict lỗi không ảnh hưởng việc lưu điểm
@@ -689,7 +692,16 @@ def _auto_predict(bang_diem: BangDiem):
 
 
 def _ensure_prediction_coverage(score_queryset, only_approved=True):
-    missing_queryset = score_queryset.filter(du_doan__isnull=True)
+    missing_queryset = score_queryset.filter(
+        du_doan__isnull=True,
+        homework_1__isnull=False,
+        homework_2__isnull=False,
+        homework_3__isnull=False,
+        quiz_1__isnull=False,
+        quiz_2__isnull=False,
+        midterm_score__isnull=False,
+        attendance_rate__isnull=False,
+    )
     if only_approved:
         missing_queryset = missing_queryset.filter(is_approved=True)
     if not missing_queryset.exists():
